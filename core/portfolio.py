@@ -2,6 +2,7 @@ from ib_async import *
 import pandas as pd
 import numpy as np
 from montecarlo import MonteCarloSimulator
+from graph import plot_portfolio_montecarlo
 import asyncio
 
 # Cache dictionary for FX rates to avoid redundant API calls
@@ -62,7 +63,7 @@ async def check_portfolio() -> None:
     total_value = 0.0
 
     ib = IB()
-    await ib.connectAsync('127.0.0.1', 4002, clientId=1)
+    await ib.connectAsync('127.0.0.1', 4001, clientId=1)
     print(f"Connected to IBKR: {ib.isConnected()}\n")
 
     try:
@@ -179,6 +180,9 @@ async def check_portfolio() -> None:
         print(f"\n--- 5-YEAR SIMULATION RESULTS ---")
         for scenario, value in scenarios.items():
             print(f"{scenario} Scenario: {base_currency} {value:,.2f}")
+        
+        # --- 8. Visualization ---
+        plot_portfolio_montecarlo(simulated_prices)
 
     finally:
         ib.disconnect()
