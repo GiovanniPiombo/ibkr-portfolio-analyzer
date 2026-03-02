@@ -9,6 +9,14 @@ class MonteCarloSimulator:
     """
 
     def __init__(self, capital: float, mu: float, sigma: float, years: int, simulations: int = 10000):
+        if capital <= 0:
+            raise ValueError("Capital must be strictly positive.")
+        if sigma < 0:
+            raise ValueError("Volatility (sigma) cannot be negative.")
+        if years < 0:
+            raise ValueError("Years cannot be negative.")
+        if simulations <= 0:
+            raise ValueError("Number of simulations must be at least 1.")
         self.capital = capital
         self.mu = mu
         self.sigma = sigma
