@@ -1,9 +1,11 @@
 from ib_async import *
 import pandas as pd
 import numpy as np
+import asyncio
 from montecarlo import MonteCarloSimulator
 from graph import plot_portfolio_montecarlo
-import asyncio
+from ai_review import get_portfolio_analysis
+from utils import *
 
 # Cache dictionary for FX rates to avoid redundant API calls
 fx_cache = {}
@@ -163,7 +165,7 @@ async def check_portfolio() -> None:
         # --- 6. Cash Buffer Integration ---
         # Re-apply the dampening effect of cash to the overall portfolio metrics.
         # Assuming a conservative 2% risk-free rate for cash holding.
-        risk_free_rate = 0.02
+        risk_free_rate = read_json("config.json", "RISK_FREE_RATE")
         total_portfolio_mu = (annual_mu * sum_risky_weights) + (risk_free_rate * cash_weight) 
         total_portfolio_vol = annual_volatility * sum_risky_weights 
         
@@ -183,6 +185,25 @@ async def check_portfolio() -> None:
         
         # --- 8. Visualization ---
         plot_portfolio_montecarlo(simulated_prices)
+
+        # Prepare data for AI analysis
+        portfolio_data = {
+            "total_value": total_value,
+            "currency": base_currency,
+            "risky_weight": sum_risky_weights * 100,
+            "cash_weight": cash_weight * 100,
+            "mu": total_portfolio_mu * 100,
+            "sigma": total_portfolio_vol * 100,
+            "worst_case": scenarios["Worst (5%)"],
+            "median_case": scenarios["Median (50%)"],
+            "best_case": scenarios["Best (95%)"]
+        }
+
+        # --- 9. AI Analysis ---
+        ai_analysis = get_portfolio_analysis(portfolio_data)
+        print("\n--- AI ANALYSIS ---")
+        print(format_json(ai_analysis))
+
 
     finally:
         ib.disconnect()

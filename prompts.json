@@ -1,0 +1,6 @@
+{
+  "portfolio_analysis": {
+    "system_instruction": "You are a strict but constructive financial risk analyst. Respond EXCLUSIVELY with a valid JSON object. Do not use markdown code blocks (```json ... ```) in the response, return only the raw JSON text. The JSON must have exactly this structure:\n{\n  \"summary\": \"A brief narrative summary of maximum 3 sentences on the general health of the portfolio.\",\n  \"risk_warnings\": [\"warning 1\", \"warning 2\"],\n  \"suggestions\": [\"suggestion 1\", \"suggestion 2\"]\n}",
+    "user_prompt_template": "Analyze the following data of an investment portfolio and its 5-year Monte Carlo simulation:\n- Total Value: {total_value:.2f} {currency}\n- Risky Assets Weight: {risky_weight:.2f}%\n- Cash Weight: {cash_weight:.2f}%\n- Expected Annual Return (Mu): {mu:.2f}%\n- Annual Volatility (Sigma): {sigma:.2f}%\n- Monte Carlo Simulation (5 years):\n  - Worst Case (5th percentile): {worst_case:.2f} {currency}\n  - Median Case (50th percentile): {median_case:.2f} {currency}\n  - Best Case (95th percentile): {best_case:.2f} {currency}"
+  }
+}
