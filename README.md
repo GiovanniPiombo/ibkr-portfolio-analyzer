@@ -6,8 +6,8 @@ Desktop application for risk analysis and financial portfolio simulation. It fet
 * **Broker Integration:** Automatic download of positions, currencies, and historical data from Interactive Brokers.
 * **Risk Analysis:** Calculation of the covariance matrix and annualized portfolio volatility.
 * **Monte Carlo Simulation:** Probabilistic forecasting based on Geometric Brownian Motion to calculate future scenarios (Worst 5%, Median 50%, Best 95%).
-* **Data Visualization:** Interactive charts to display the simulation cone (PySide / Matplotlib) [TODO].
-* **AI Feedback:** Integration with the Gemini API for results analysis and portfolio insights [TODO].
+* **Data Visualization:** Interactive charts to display the simulation cone (Matplotlib).
+* **AI Feedback:** Integration with the Gemini API for results analysis and portfolio insights.
 
 ## Project Structure
 The codebase will be organized into separate modules like this:
@@ -20,17 +20,15 @@ The codebase will be organized into separate modules like this:
 │   ├── portfolio.py          # IBKR connection and data fetching
 │   ├── montecarlo.py         # Mathematical simulation engine
 │   ├── ai_review.py          # AI chat and feedback management
-│   └── config_api.py         # API keys reader from JSON
-├── utils/                    # Utilities
-│   └── paths.py              # Absolute/relative paths management
+│   └── utils.py              # Supports functions
 ├── tests/                    # Testing suite
-├── config.json               # API Credentials (Gemini)
+├── config.json               # API Credentials (Gemini) / Risk Free Rate
 ├── app.spec                  # PyInstaller build setup
 └── requirements.txt          # Python dependencies
 ```
 
 ## Tech Stack
 - Core: Python
-- Graphical Interface: PySide6 + QSS
+- Graphical Interface: PySide6 + QSS + MatplotLib
 - Data & Math: Pandas, Numpy 
 - Integrations: IBKR API (ib_async), Gemini API
