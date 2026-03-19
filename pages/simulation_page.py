@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter
 from PySide6.QtCore import Qt, Signal
 from workers.simulation_thread import SimulationWorker, FastMathWorker
+from core.utils import read_json
 
 class MplCanvas(FigureCanvas):
     """Custom canvas to integrate Matplotlib in PySide6 with a dark theme."""
@@ -60,13 +61,16 @@ class SimulationPage(QWidget):
         lbl_years = QLabel("Years:")
         self.spin_years = QSpinBox()
         self.spin_years.setRange(1, 30)
-        self.spin_years.setValue(5)
+        # Read default from config:
+        self.spin_years.setValue(read_json("config.json", "DEFAULT_YEARS") or 5)
         
         # Simulations Selector
         lbl_sims = QLabel("Simulations:")
         self.combo_sims = QComboBox()
         self.combo_sims.addItems(["1000", "10000", "50000", "100000"])
-        self.combo_sims.setCurrentText("10000")
+        # Read default from config:
+        default_sims = str(read_json("config.json", "DEFAULT_SIMS") or "10000")
+        self.combo_sims.setCurrentText(default_sims)
 
         # Run Button
         self.run_btn = QPushButton("Run Simulation")

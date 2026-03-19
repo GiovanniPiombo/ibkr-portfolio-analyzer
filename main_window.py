@@ -122,7 +122,10 @@ class MainWindow(QMainWindow):
         # Merge the simulation math (mu, sigma, scenarios) into our shared dictionary
         self.shared_portfolio_data.update(sim_data)
         
-        # Feed the complete dictionary to the AI Page
+        # Feed the combined data to the AI page so it can generate insights based on the full picture and language preference
+        ai_language = read_json("config.json", "AI_LANGUAGE") or "English"
+        self.shared_portfolio_data["language"] = ai_language
+        
         self.ai_page.set_portfolio_data(self.shared_portfolio_data)
 
 if __name__ == "__main__":

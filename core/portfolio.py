@@ -110,7 +110,7 @@ class PortfolioManager:
         if account_id:
             pnl_sub = self.ib.reqPnL(account_id)
             
-            timeout = 5.0
+            timeout = float(read_json("config.json", "IBKR_TIMEOUT") or 5.0)
             elapsed = 0.0
             
             while elapsed < timeout:
