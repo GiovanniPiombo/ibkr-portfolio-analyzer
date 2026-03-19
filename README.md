@@ -3,6 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6-green)]()
 [![IBKR](https://img.shields.io/badge/IBKR-API-orange)]()
+[![Tests](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Desktop application for advanced risk analysis and Monte Carlo simulation of financial portfolios. It connects directly to Interactive Brokers (IBKR) to fetch real positions, calculates future projections using stochastic models (Geometric Brownian Motion), and provides intelligent, conversational feedback via Google's Gemini AI.
@@ -55,11 +56,17 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 │   └── utils.py                  # Shared utility functions (e.g., reading JSON files).
 │
 ├── tests/                        # UNIT TESTS
+│   ├── conftest.py               # Pytest configuration and fixtures
 │   └── test_montecarlo.py        # Pytest suite for the MonteCarloSimulator, testing edge cases and statistical properties.
 │
 ├── assets/                       # ASSETS
 │   └── style.qss                 # Qt Style Sheet for the application's dark theme.
 │
+├── .github/                      # GITHUB ACTIONS
+│   └── workflows/
+│       └── tests.yml             # CI pipeline: Runs tests on Python 3.10, 3.11, 3.12
+│
+├── pytest.ini                    # Pytest configuration (asyncio_mode = auto)
 ├── config.json                   # Stores configuration like GEMINI_API_KEY, GEMINI_MODEL, and RISK_FREE_RATE.
 ├── prompts.json                  # Contains the system instructions and user prompt templates for the AI.
 └── requirements.txt              # Python package dependencies.
