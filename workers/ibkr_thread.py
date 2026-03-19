@@ -1,6 +1,7 @@
 import asyncio
 from PySide6.QtCore import QThread, Signal
 from core.portfolio import PortfolioManager
+from core.utils import read_json
 
 class IBKRWorker(QThread):
     """A QThread that connects to the IBKR API, fetches the portfolio summary and positions, and returns the data in a dictionary format suitable for the UI. It also emits progress updates at each step."""
@@ -28,9 +29,16 @@ class IBKRWorker(QThread):
 
     async def fetch_data_from_manager(self):
         """This method connects to the IBKR API, fetches the portfolio summary and positions, and returns the data in a dictionary format suitable for the UI. It also emits progress updates at each step."""
-        manager = PortfolioManager(host='127.0.0.1', port=4002, client_id=1)
         
-        self.progress_update.emit("Connecting to IBKR...")
+        # Read settings from config, providing safe defaults if they are missing
+        host = read_json("config.json", "IBKR_HOST") or '127.0.0.1'
+        port = read_json("config.json", "IBKR_PORT") or 4001
+        client_id = read_json("config.json", "IBKR_CLIENT_ID") or 1
+
+        # Use the dynamic variables here instead of hardcoded values
+        manager = PortfolioManager(host=host, port=port, client_id=client_id)
+        
+        self.progress_update.emit(f"Connecting to IBKR ({host}:{port})...")
         await manager.connect()
         print("[DEBUG] IBKR: Connected successfully!")
         

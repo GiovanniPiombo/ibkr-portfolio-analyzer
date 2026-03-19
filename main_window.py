@@ -1,17 +1,17 @@
 import sys
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
-                               QVBoxLayout, QPushButton, QStackedWidget, QLabel)
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
 from PySide6.QtCore import Qt
 
 # Import the pages
+from pages.settings_page import SettingsPage
 from pages.dashboard_page import DashboardPage
 from pages.simulation_page import SimulationPage
 from pages.ai_page import AIPage
 from core.utils import read_json
 
 class MainWindow(QMainWindow):
-        """The MainWindow class is the central hub of the application, managing the overall layout, navigation, and data flow between the different pages (Dashboard, Simulation, AI Insights). It initializes the sidebar for navigation and a stacked widget to hold the pages. The class also handles signals emitted by the pages to coordinate actions such as starting simulations after fetching IBKR data and updating the AI page with new data from the simulation results."""
-        def __init__(self):
+    """The MainWindow class is the central hub of the application, managing the overall layout, navigation, and data flow between the different pages (Dashboard, Simulation, AI Insights). It initializes the sidebar for navigation and a stacked widget to hold the pages. The class also handles signals emitted by the pages to coordinate actions such as starting simulations after fetching IBKR data and updating the AI page with new data from the simulation results."""
+    def __init__(self):
         super().__init__()
         self.setWindowTitle("IBKR Portfolio Analyzer")
         self.resize(1200, 800)
@@ -57,9 +57,13 @@ class MainWindow(QMainWindow):
         self.btn_ai = QPushButton("AI Insights")
         self.btn_ai.setCheckable(True)
 
+        self.btn_settings = QPushButton("Settings")
+        self.btn_settings.setCheckable(True)
+
         sidebar_layout.addWidget(self.btn_dashboard)
         sidebar_layout.addWidget(self.btn_simulation)
         sidebar_layout.addWidget(self.btn_ai)
+        sidebar_layout.addWidget(self.btn_settings)
         sidebar_layout.addStretch()
 
         main_layout.addWidget(self.sidebar)
@@ -70,10 +74,12 @@ class MainWindow(QMainWindow):
         self.dashboard_page = DashboardPage()
         self.simulation_page = SimulationPage()
         self.ai_page = AIPage()
+        self.settings_page = SettingsPage()
 
         self.stacked_widget.addWidget(self.dashboard_page)
         self.stacked_widget.addWidget(self.simulation_page)
         self.stacked_widget.addWidget(self.ai_page)
+        self.stacked_widget.addWidget(self.settings_page)
 
         main_layout.addWidget(self.stacked_widget)
 
@@ -83,6 +89,7 @@ class MainWindow(QMainWindow):
         self.btn_dashboard.clicked.connect(lambda: self.switch_page(0, self.btn_dashboard))
         self.btn_simulation.clicked.connect(lambda: self.switch_page(1, self.btn_simulation))
         self.btn_ai.clicked.connect(lambda: self.switch_page(2, self.btn_ai))
+        self.btn_settings.clicked.connect(lambda: self.switch_page(3, self.btn_settings))
 
         # Core Application Flow
         # 1. When Dashboard finishes, automatically trigger Simulation background load
@@ -96,7 +103,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentIndex(index)
         
         # Uncheck all buttons except the active one
-        for btn in [self.btn_dashboard, self.btn_simulation, self.btn_ai]:
+        for btn in [self.btn_dashboard, self.btn_simulation, self.btn_ai, self.btn_settings]:
             if btn != active_button:
                 btn.setChecked(False)
         active_button.setChecked(True)

@@ -1,5 +1,8 @@
 {
-    "GEMINI_API_KEY": "YOUR API KEY",
+    "GEMINI_API_KEY": "Your Gemini API Key Here",
     "GEMINI_MODEL": "gemini-3-flash-preview",
-    "RISK_FREE_RATE": 0.02
+    "RISK_FREE_RATE": 0.02,
+    "IBKR_HOST": "127.0.0.1",
+    "IBKR_PORT": 4001,
+    "IBKR_CLIENT_ID": 1
 }

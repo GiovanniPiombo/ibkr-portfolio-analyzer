@@ -23,3 +23,15 @@ def read_json(file, parameter_name=None):
 def format_json(data):
     """Utility function to format a dictionary as a JSON string."""
     return json.dumps(data, indent=4, ensure_ascii=False)
+
+def write_json(file, data):
+    """
+    Write a dictionary to a JSON file in a formatted way.
+    """
+    try:
+        with open(file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error writing {file}: {e}")
+        return False

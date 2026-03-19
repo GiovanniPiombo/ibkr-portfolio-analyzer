@@ -3,6 +3,7 @@ from PySide6.QtCore import QThread, Signal
 from core.portfolio import PortfolioManager
 import numpy as np
 from core.montecarlo import MonteCarloSimulator
+from core.utils import read_json
 
 class SimulationWorker(QThread):
     """A QThread that handles the entire simulation process, from fetching data to calculating risk metrics and running Monte Carlo simulations."""
@@ -25,9 +26,15 @@ class SimulationWorker(QThread):
 
     async def run_simulation_tasks(self):
         """Asynchronous method that performs the simulation tasks step by step, emitting progress updates and final data."""
-        pm = PortfolioManager(host='127.0.0.1', port=4002, client_id=1)
+        # Read settings from config
+        host = read_json("config.json", "IBKR_HOST") or '127.0.0.1'
+        port = read_json("config.json", "IBKR_PORT") or 4001
+        client_id = read_json("config.json", "IBKR_CLIENT_ID") or 1
+
+        # Use the dynamic variables
+        pm = PortfolioManager(host=host, port=port, client_id=client_id)
         
-        self.progress_update.emit("Connecting to IBKR...")
+        self.progress_update.emit(f"Connecting to IBKR ({host}:{port})...")
         connected = await pm.connect()
         if not connected:
             self.error_occurred.emit("Failed to connect to IBKR. Is TWS/Gateway running?")
