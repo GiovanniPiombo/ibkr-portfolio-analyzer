@@ -18,6 +18,7 @@ class PathManager:
     CONFIG_FILE: Path = Path(os.getenv("APP_CONFIG_FILE", BASE_DIR / "config.json"))
     PROMPTS_FILE: Path = Path(os.getenv("APP_PROMPTS_FILE", BASE_DIR / "prompts.json"))
     STYLE_FILE: Path = Path(os.getenv("APP_STYLE_FILE", ASSETS_DIR / "style.qss"))
+    ICON_FILE: str = str(Path(os.getenv("APP_ICON_FILE", ASSETS_DIR / "Icon.ico" )))
 
     @classmethod
     def get_asset(cls, filename: str) -> Path:
