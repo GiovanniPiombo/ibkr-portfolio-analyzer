@@ -26,6 +26,7 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 
 ```text
 .
+├── .gitignore                    # gitignore
 ├── main.py                       # Application entry point. Initializes QApplication and MainWindow.
 ├── main_window.py                # Sets up the main window, the sidebar navigation, and the stacked widget for pages.
 │
@@ -65,6 +66,8 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 ├── pytest.ini                    # Pytest configuration (asyncio_mode = auto)
 ├── config.json                   # Stores configuration like GEMINI_API_KEY, GEMINI_MODEL, and RISK_FREE_RATE.
 ├── prompts.json                  # Contains the system instructions and user prompt templates for the AI.
+├── License                       # MIT License
+├── build.spec                    # Pyinstaller spec file
 └── requirements.txt              # Python package dependencies.
 ```
 
