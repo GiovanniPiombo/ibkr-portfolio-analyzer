@@ -31,6 +31,7 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 ├── pages/                        # UI SCREENS: Each file represents a tab in the application.
 │   ├── dashboard_page.py         # Displays portfolio summary (NLV, Cash, PnL) and open positions. Triggers IBKRWorker.
 │   ├── simulation_page.py        # Monte Carlo controls (years, simulations). Displays results on a graph. Manages SimulationWorker and FastMathWorker.
+│   ├── settings_page.py          # Settings Page
 │   └── ai_page.py                # Displays the AI-generated report. Triggers AIWorker.
 │
 ├── workers/                      # BACKGROUND THREADS: Bridge between the UI and the Core logic.
@@ -43,6 +44,7 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 │   ├── montecarlo.py             # MonteCarloSimulator: The mathematical engine. Runs vectorized GBM simulations using NumPy.
 │   ├── ai_review.py              # Handles prompting and communication with the Google Gemini API.
 │   ├── graph.py                  # Standalone plotting functions (used for debugging, as the UI uses its own canvas).
+│   ├── path_manager.py           # Path Manager
 │   └── utils.py                  # Shared utility functions (e.g., reading JSON files).
 │
 ├── tests/                        # UNIT TESTS
@@ -126,6 +128,7 @@ Follow these steps to get the application running on your local machine.
 * **Dashboard:** Upon starting, the app automatically connects to IBKR and fetches your portfolio data. Click the "Refresh IBKR Data" button to manually update.
 * **Simulation:** Navigate to the "Simulation" tab. The first time you visit, it will automatically start a background preload (fetching historical data and calculating base risk metrics). Once preloaded, you can adjust the years and number of simulations and click "Run Simulation" for instant results.
 * **AI Insights:** After running a simulation, go to the "AI Insights" tab. The AI analysis will trigger automatically, providing a detailed report on your portfolio's risk and potential.
+* **Settings:** A dedicated interface that allows you to configure Gemini API keys, IBKR connection parameters (host, port, client ID), and simulation defaults without manually editing the JSON file.
   
 ## Running Tests
 
