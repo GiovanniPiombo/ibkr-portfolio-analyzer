@@ -1,7 +1,8 @@
 import sys
+from core.path_manager import PathManager
+PathManager.init_configs() # PEP 8 compliance: 0%. PyInstaller survival rate: 100%. Do not touch. It works               
 from PySide6.QtWidgets import QApplication
 from main_window import MainWindow
-from core.path_manager import PathManager
 from PySide6.QtGui import QIcon
 
 if __name__ == "__main__":

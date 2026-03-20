@@ -8,7 +8,6 @@ config.json
 .env
 build/
 dist/
-*.spec
 .DS_Store
 Thumbs.db
 .pytest_cache/
