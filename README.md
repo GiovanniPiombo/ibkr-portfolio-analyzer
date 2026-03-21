@@ -20,7 +20,6 @@ Built with a clean, modular architecture that strictly separates the UI (PySide6
 
 *   **Direct IBKR Integration:** Automatically downloads real portfolio data (Net Liquidation Value, Cash, Positions, Daily P&L) via the `ib_async` library. Supports multi-currency portfolios with automatic FX conversion.
 *   **Monte Carlo Simulation:** Uses Geometric Brownian Motion to project thousands of possible future portfolio paths. Calculates key scenarios: Worst Case (5th percentile), Median (50th), and Best Case (95th).
-*   **Interactive Visualizations:** Dynamic Matplotlib charts embedded in the UI display the simulation cone, with background paths and clearly highlighted percentile lines.
 *   **AI-Powered Insights:** Sends your portfolio composition and simulation results to Google's Gemini API, generating a structured, natural language report with personalized observations and suggestions.
 *   **Optimized Performance:** Employs a multi-threaded architecture to keep the UI responsive. Uses a "FastMathWorker" to instantly recalculate simulations from cached risk metrics without re-fetching historical data.
 *   **Professional UI:** Clean, dark-themed interface inspired by Bloomberg terminals, built with PySide6 and custom QSS styling.
