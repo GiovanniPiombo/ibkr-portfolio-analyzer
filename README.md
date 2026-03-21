@@ -83,20 +83,34 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 
 ## Installation and Setup
 
-Follow these steps to get the application running on your local machine.
+You can install the application using the standalone Windows installer or set up the development environment to run and build it from the source code.
 
-### Prerequisites
+### Option 1: Windows Installer (Recommended for Users)
+
+If you are on Windows and want a quick setup without dealing with Python environments, use the standalone installer.
+
+1. Download the latest setup executable from the project's **Releases** page.
+2. Run the installer and follow the on-screen instructions provided by Inno Setup.
+3. Launch the application directly from your Start Menu or Desktop shortcut.
+
+*Note: You will still need a running instance of IBKR Trader Workstation (TWS) or IB Gateway, and a Google AI Studio API key to configure the app after installation.*
+
+### Option 2: Development & Building from Source
+
+Follow these steps if you want to run the application directly from the source code, contribute to the development, or build the standalone executable yourself.
+
+#### Prerequisites
 
 - Python 3.9 or higher installed on your system.
-- A running instance of IBKR Trader Workstation (TWS) or IB Gateway, configured to allow API connections on port 4002 (or your preferred port).
+- A running instance of IBKR Trader Workstation (TWS) or IB Gateway, configured to allow API connections
 - A Google AI Studio API key for the Gemini features.
+- (Optional) Inno Setup installed, if you intend to build the Windows installer.
 
-### Step-by-Step Guide
+#### 1. Running from Source
 
 1. **Clone the repository:**
-
    ```bash
-   git clone https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git
+   git clone [https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git)
    cd ibkr-portfolio-analyzer
    ```
    
@@ -120,39 +134,25 @@ Follow these steps to get the application running on your local machine.
    
 4. **Configure the application:**
    
-   - Rename `config.example.json` to `config.json` (if an example file is provided, otherwise create it).
-   - Edit `config.json` and add your `GEMINI_API_KEY`. You can also adjust the `GEMINI_MODEL` and `RISK_FREE_RATE`.
-   - Ensure the `host` and `port` in `workers/ibkr_thread.py` and `workers/simulation_thread.py` match your TWS/IB Gateway settings (default is `4002`).
-   - (Optional) Review and customize the prompts in `prompts.json` to change the AI's behavior.
+   - Gemini API Key: Enter your Google AI Studio API key (required for AI Insights feature)
+   - IBKR Connection: Verify host (default: 127.0.0.1), port (default: 4002), and client ID (default: 1)
+   - Simulation Defaults: Adjust risk-free rate and other parameters as needed
      
 5. **Run the application:**
    
    ```bash
    python main.py
    ```
-## How to use
 
-* **Dashboard:** Upon starting, the app automatically connects to IBKR and fetches your portfolio data. Click the "Refresh IBKR Data" button to manually update.
-* **Simulation:** Navigate to the "Simulation" tab. The first time you visit, it will automatically start a background preload (fetching historical data and calculating base risk metrics). Once preloaded, you can adjust the years and number of simulations and click "Run Simulation" for instant results.
-* **AI Insights:** After running a simulation, go to the "AI Insights" tab. The AI analysis will trigger automatically, providing a detailed report on your portfolio's risk and potential.
-* **Settings:** A dedicated interface that allows you to configure Gemini API keys, IBKR connection parameters (host, port, client ID), and simulation defaults without manually editing the JSON file.
-  
-## Running Tests
-
-The core mathematical logic is thoroughly tested. To run the test suite:
-```bash
-   pytest tests/ -v
-```
-
-## Building a Standalone Executable
+#### 2. Build the Executable PyInstaller
 
 The application can be packaged into a single executable file using PyInstaller, making it easy to distribute and run without a Python environment.
 
-### Prerequisites
+##### Prerequisites
 
 - PyInstaller installed (`pip install pyinstaller`)
 
-### Build Instructions
+##### Build Instructions
 
 1. **Ensure all dependencies are installed:**
 
@@ -172,14 +172,14 @@ The application can be packaged into a single executable file using PyInstaller,
    - On Windows: dist/IBKR Portfolio Analyzer.exe
    - The build includes application icons (Icon.ico, Icon.png, IconSetup.ico) embedded in the executable and used for the window icon.
      
-### What the Build Includes
+##### What the Build Includes
 
 - All Python dependencies bundled with the executable
 - Application assets (icons, stylesheets) embedded via the spec file
 - Configuration files (config.json, prompts.json) - these must be present in the same directory as the executable at runtime
 - Optimized build with --clean flag to ensure a fresh compilation
 
-## Post-Build Configuration
+#### Post-Build Configuration
 
 **Important**: After building the executable, you must configure the application settings:
 1. Launch the executable - The application will start with default placeholder values.
@@ -191,4 +191,19 @@ The application can be packaged into a single executable file using PyInstaller,
 4. Save settings - The configuration is automatically saved to config.json in the executable's directory.
    
 **Note**: The first-time user must supply their own Gemini API key. The application does not include any pre-configured keys
+
+### How to use
+
+* **Dashboard:** Upon starting, the app automatically connects to IBKR and fetches your portfolio data. Click the "Refresh IBKR Data" button to manually update.
+* **Simulation:** Navigate to the "Simulation" tab. The first time you visit, it will automatically start a background preload (fetching historical data and calculating base risk metrics). Once preloaded, you can adjust the years and number of simulations and click "Run Simulation" for instant results.
+* **AI Insights:** After running a simulation, go to the "AI Insights" tab. The AI analysis will trigger automatically, providing a detailed report on your portfolio's risk and potential.
+* **Settings:** A dedicated interface that allows you to configure Gemini API keys, IBKR connection parameters (host, port, client ID), and simulation defaults without manually editing the JSON file.
+  
+## Running Tests
+
+The core mathematical logic is thoroughly tested. To run the test suite:
+```bash
+   pytest tests/ -v
+```
+
 
