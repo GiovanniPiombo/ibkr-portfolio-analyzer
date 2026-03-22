@@ -55,16 +55,17 @@ class MarkowitzOptimizer:
         _, p_vol = self.portfolio_performance(weights)
         return p_vol
 
-    def optimize_max_sharpe(self) -> dict:
+    def optimize_max_sharpe(self, bounds: tuple = None, initial_guess: np.ndarray = None) -> dict:
         """
         Uses Sequential Least Squares Programming (SLSQP) to find the weights 
-        that maximize the Sharpe Ratio.
+        that maximize the Sharpe Ratio, respecting optional constraints.
         """
-        initial_guess = self.num_assets * [1. / self.num_assets]
-        
+        if initial_guess is None:
+            initial_guess = np.array(self.num_assets * [1. / self.num_assets])
+        if bounds is None:
+            bounds = tuple((0.0, 1.0) for _ in range(self.num_assets))
+            
         constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
-        
-        bounds = tuple((0.0, 1.0) for _ in range(self.num_assets))
         
         result = sco.minimize(
             self.negative_sharpe_ratio, 
@@ -75,7 +76,6 @@ class MarkowitzOptimizer:
         )
         
         opt_return, opt_vol = self.portfolio_performance(result.x)
-        
         return {
             "weights": np.round(result.x, 4).tolist(),
             "return": opt_return,
@@ -83,23 +83,26 @@ class MarkowitzOptimizer:
             "sharpe": (opt_return - self.risk_free_rate) / opt_vol if opt_vol > 0 else 0
         }
 
-    def generate_efficient_frontier(self, points: int = 50) -> list:
+    def generate_efficient_frontier(self, points: int = 50, bounds: tuple = None, initial_guess: np.ndarray = None) -> list:
         """
-        Generates coordinates (Volatility, Return) to plot the Efficient Frontier curve.
-        
-        It sweeps through a range of target returns, from the minimum possible 
-        variance to the maximum possible individual asset return, calculating 
-        the minimum volatility for each target return.
+        Generates coordinates to plot the Efficient Frontier curve, respecting locked assets.
         """
-        initial_guess = self.num_assets * [1. / self.num_assets]
-        bounds = tuple((0.0, 1.0) for _ in range(self.num_assets))
+        if initial_guess is None:
+            initial_guess = np.array(self.num_assets * [1. / self.num_assets])
+        if bounds is None:
+            bounds = tuple((0.0, 1.0) for _ in range(self.num_assets))
+            
         constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
         
         min_var_result = sco.minimize(self.minimize_volatility, initial_guess, method='SLSQP', bounds=bounds, constraints=constraints)
-        min_ret, min_vol = self.portfolio_performance(min_var_result.x)
+        min_ret, _ = self.portfolio_performance(min_var_result.x)
         
-        max_ret = self.returns.max()
+        max_ret_result = sco.minimize(lambda x: -self.portfolio_performance(x)[0], initial_guess, method='SLSQP', bounds=bounds, constraints=constraints)
+        max_ret, _ = self.portfolio_performance(max_ret_result.x)
         
+        if max_ret <= min_ret:
+            return [{"volatility": min_var_result.fun, "return": min_ret}]
+            
         target_returns = np.linspace(min_ret, max_ret, points)
         frontier_vols = []
         
