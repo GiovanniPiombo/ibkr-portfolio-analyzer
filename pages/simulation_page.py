@@ -30,10 +30,10 @@ class SimulationPage(QWidget):
         super().__init__()
         
         # ── CACHE VARIABLES FOR OPTIMIZATION ─────────────────
-        self.cached_mu = None
-        self.cached_sigma = None
-        self.cached_capital = None
-        
+        self.cached_metrics = None
+        self.cached_gbm_data = None
+        self.cached_merton_data = None
+        self.time_steps = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -70,6 +70,12 @@ class SimulationPage(QWidget):
         default_sims = str(read_json(PathManager.CONFIG_FILE, "DEFAULT_SIMS") or "10000")
         self.combo_sims.setCurrentText(default_sims)
 
+        # ── Model Toggle Selector ───────────────────────
+        lbl_model = QLabel("Model:")
+        self.combo_model = QComboBox()
+        self.combo_model.addItems(["Merton Stress Test", "Standard GBM"])
+        self.combo_model.currentIndexChanged.connect(self.update_view)
+
         # ── Run Button ───────────────────────────────────────
         self.run_btn = QPushButton("Run Simulation")
         self.run_btn.setObjectName("primary_btn")
@@ -81,6 +87,8 @@ class SimulationPage(QWidget):
         controls_layout.addWidget(self.spin_years)
         controls_layout.addWidget(lbl_sims)
         controls_layout.addWidget(self.combo_sims)
+        controls_layout.addWidget(lbl_model)
+        controls_layout.addWidget(self.combo_model)
         controls_layout.addStretch()
         controls_layout.addWidget(self.run_btn)
         
@@ -165,53 +173,79 @@ class SimulationPage(QWidget):
         self.worker.error_occurred.connect(self.on_simulation_error)
         
         self.worker.start()
-
-    def on_simulation_complete(self, scenarios, mu, sigma, capital, time_steps, worst_line, median_line, best_line, background_lines):
+    
+    def on_simulation_complete(self, payload):
         """
-        Callback executed upon successful completion of the SimulationWorker.
+        Callback executed when the initial background simulation completes.
 
-        Saves the fundamental parameters to the class cache, updates the 
-        monetary values in the summary cards, and passes the paths to the 
-        chart. Finally, it emits the `simulation_finished` signal.
+        Parses the payload received from the SimulationWorker, caches the 
+        risk metrics, GBM, and Merton model data, and triggers a view update.
 
         Args:
-            scenarios (dict): Dictionary with the calculated percentile results.
-            mu (float): Annualized mean return (drift).
-            sigma (float): Annualized volatility.
-            capital (float): Initial capital value.
-            time_steps (np.ndarray): X-axis for the chart (months or years).
-            worst_line (np.ndarray): 5th percentile path.
-            median_line (np.ndarray): 50th percentile path.
-            best_line (np.ndarray): 95th percentile path.
-            background_lines (list): Sample of individual paths for the background.
+            payload (dict): A dictionary containing 'metrics', 'gbm', 
+                'merton', and 'time_steps' data from the simulation.
         """
-        # ── Store Metrics ────────────────────────────────────────
-        self.cached_mu = mu
-        self.cached_sigma = sigma
-        self.cached_capital = capital
+        self.cached_metrics = payload["metrics"]
         
-        # ── Update Summary Cards ─────────────────────────────────
+        self.cached_gbm_data = payload["gbm"]
+        self.cached_merton_data = payload["merton"]
+        self.time_steps = payload["time_steps"]
+        
+        self.update_view()
+        self.run_btn.setEnabled(True)
+        self.run_btn.setText("Run Simulation")
+
+    def update_view(self):
+        """
+        Switches the UI text and chart between the two models instantly based on the dropdown.
+
+        Updates the summary cards (Worst, Median, Best) and redraws the chart 
+        using the currently selected model (Standard GBM or Merton Stress Test). 
+        Finally, emits the updated data via the `simulation_finished` signal.
+        """
+        if not self.cached_gbm_data or not self.cached_merton_data:
+            return
+
+        if self.combo_model.currentText() == "Standard GBM":
+            active_data = self.cached_gbm_data
+        else:
+            active_data = self.cached_merton_data
+
+        scenarios = active_data["scenarios"]
+        
         cur = "€"
         self.worst_label.setText(f"{cur} {scenarios['Worst (5%)']:,.2f}")
         self.median_label.setText(f"{cur} {scenarios['Median (50%)']:,.2f}")
         self.best_label.setText(f"{cur} {scenarios['Best (95%)']:,.2f}")
         
-        # ── Pass the pre-calculated lines to the graph ───────────
-        self.chart_view.update_graph(time_steps, worst_line, median_line, best_line, background_lines)
+        self.chart_view.update_graph(
+            self.time_steps, 
+            active_data["worst"], 
+            active_data["median"], 
+            active_data["best"], 
+            active_data["background"]
+        )
         
-        # ── Reset the button ─────────────────────────────────────
-        self.run_btn.setEnabled(True)
-        self.run_btn.setText("Run Simulation")
-
         sim_data = {
-            "total_value": capital,
-            "mu": mu * 100,
-            "sigma": sigma * 100,
+            "total_value": self.cached_metrics["risky_capital"] + self.cached_metrics["cash_capital"],
+            "mu": self.cached_metrics["total_mu"] * 100,
+            "sigma": self.cached_metrics["total_vol"] * 100,
             "worst_case": scenarios["Worst (5%)"],
             "median_case": scenarios["Median (50%)"],
             "best_case": scenarios["Best (95%)"]
         }
         self.simulation_finished.emit(sim_data)
+
+    def on_fast_math_complete(self, payload):
+        """Callback executed upon completion of the FastMathWorker calculations."""
+        self.cached_gbm_data = payload["gbm"]
+        self.cached_merton_data = payload["merton"]
+        self.time_steps = payload["time_steps"]
+        
+        self.update_view()
+        
+        self.run_btn.setEnabled(True)
+        self.run_btn.setText("Run Simulation")
 
     def on_simulation_error(self, error_msg):
         """
@@ -230,13 +264,9 @@ class SimulationPage(QWidget):
     def on_run_clicked(self):
         """
         Handles the click event on the "Run Simulation" button.
-
-        Checks that the base data is already cached; if present, it starts 
-        a `FastMathWorker` to execute new simulations based on the user's 
-        chosen parameters (years and iterations) without re-downloading 
-        the financial data.
+        Starts a FastMathWorker to execute new simulations based on user parameters.
         """
-        if self.cached_capital is None:
+        if getattr(self, "cached_metrics", None) is None:
             self.run_btn.setText("Still downloading background data...")
             return
             
@@ -251,9 +281,7 @@ class SimulationPage(QWidget):
         
         # ── Launch the thread ────────────────────────────────────
         self.fast_worker = FastMathWorker(
-            capital=self.cached_capital,
-            mu=self.cached_mu,
-            sigma=self.cached_sigma,
+            metrics=self.cached_metrics,
             years=years,
             simulations=simulations
         )
@@ -263,38 +291,3 @@ class SimulationPage(QWidget):
         self.fast_worker.error_occurred.connect(self.on_simulation_error)
         
         self.fast_worker.start()
-
-    def on_fast_math_complete(self, scenarios, time_steps, worst_line, median_line, best_line, background_lines):
-        """
-        Callback executed upon completion of the FastMathWorker calculations.
-
-        Updates the UI with the newly calculated scenarios and updates the chart
-        using the `mu`, `sigma`, and `capital` parameters already in the cache.
-        Emits the newly updated data via the `simulation_finished` signal.
-
-        Args:
-            scenarios (dict): The newly calculated percentile results.
-            time_steps (np.ndarray): Updated X-axis for the chart.
-            worst_line (np.ndarray): New 5th percentile path.
-            median_line (np.ndarray): New 50th percentile path.
-            best_line (np.ndarray): New 95th percentile path.
-            background_lines (list): New background paths.
-        """
-        cur = "€"
-        self.worst_label.setText(f"{cur} {scenarios['Worst (5%)']:,.2f}")
-        self.median_label.setText(f"{cur} {scenarios['Median (50%)']:,.2f}")
-        self.best_label.setText(f"{cur} {scenarios['Best (95%)']:,.2f}")
-    
-        self.chart_view.update_graph(time_steps, worst_line, median_line, best_line, background_lines)
-        
-        self.run_btn.setEnabled(True)
-        self.run_btn.setText("Run Simulation")
-        sim_data = {
-            "total_value": self.cached_capital,
-            "mu": self.cached_mu * 100,
-            "sigma": self.cached_sigma * 100,
-            "worst_case": scenarios["Worst (5%)"],
-            "median_case": scenarios["Median (50%)"],
-            "best_case": scenarios["Best (95%)"]
-        }
-        self.simulation_finished.emit(sim_data)

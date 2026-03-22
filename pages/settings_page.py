@@ -82,8 +82,15 @@ class SettingsPage(QWidget):
         self.mc_sims_input = QComboBox()
         self.mc_sims_input.addItems(["1000", "10000", "50000", "100000"])
 
+        self.jump_threshold_input = QDoubleSpinBox()
+        self.jump_threshold_input.setRange(1.0, 10.0)
+        self.jump_threshold_input.setSingleStep(0.5)
+        self.jump_threshold_input.setSuffix(" \u03c3 (Sigma)")
+        self.jump_threshold_input.setToolTip("Sets the standard deviation multiplier to identify historical market crashes (Merton Jumps). Lower = more sensitive.")
+
         form_layout.addRow(QLabel("Default Years:"), self.mc_years_input)
         form_layout.addRow(QLabel("Default Simulations:"), self.mc_sims_input)
+        form_layout.addRow(QLabel("Jump Threshold:"), self.jump_threshold_input)
 
         # ─── Broker Settings ───────────────────────────────────────────
         broker_section = QLabel("IBKR CONNECTION SETTINGS")
@@ -140,6 +147,8 @@ class SettingsPage(QWidget):
             self.mc_years_input.setValue(config.get("DEFAULT_YEARS", 5))
             self.mc_sims_input.setCurrentText(str(config.get("DEFAULT_SIMS", 10000)))
 
+            self.jump_threshold_input.setValue(config.get("JUMP_THRESHOLD", 3.0))
+
             self.ibkr_host_input.setText(config.get("IBKR_HOST", "127.0.0.1"))
             self.ibkr_port_input.setValue(config.get("IBKR_PORT", 4001))
             self.ibkr_client_id_input.setValue(config.get("IBKR_CLIENT_ID", 1))
@@ -165,6 +174,7 @@ class SettingsPage(QWidget):
         
         config["DEFAULT_YEARS"] = self.mc_years_input.value()
         config["DEFAULT_SIMS"] = int(self.mc_sims_input.currentText())
+        config["JUMP_THRESHOLD"] = round(self.jump_threshold_input.value(), 2)
 
         config["IBKR_HOST"] = self.ibkr_host_input.text().strip()
         config["IBKR_PORT"] = self.ibkr_port_input.value()

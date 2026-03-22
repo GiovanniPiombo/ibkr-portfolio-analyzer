@@ -2,34 +2,28 @@ import asyncio
 from PySide6.QtCore import QThread, Signal
 from core.portfolio import PortfolioManager
 import numpy as np
-from core.montecarlo import MonteCarloSimulator
+from core.gbm_model import GBMSimulator
+from core.merton_model import MJDSimulator
 from core.utils import read_json
 from core.path_manager import PathManager
 
 class SimulationWorker(QThread):
     """
-    Orchestrates the complete data fetching and initial simulation pipeline.
+    A background worker thread for fetching portfolio data from IBKR 
+    and executing full Monte Carlo simulations.
 
-    This thread bridges the synchronous PySide6 UI with the asynchronous IBKR 
-    network calls. It connects to the broker, downloads current portfolio 
-    holdings, fetches 5 years of historical pricing, calculates the risk metrics 
-    (drift and volatility), and runs the initial Monte Carlo simulation. 
-    Finally, it pre-calculates the necessary NumPy arrays for chart rendering 
-    to prevent UI freezing.
-
-    Signals:
-        progress_update (str): Emitted during state changes to update UI loading text.
-        data_fetched (dict, float, float, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray): 
-            Emitted upon complete success. Payload includes: scenarios, mu, sigma, 
-            capital, time_steps, worst_line, median_line, best_line, background_lines.
-        error_occurred (str): Emitted if network or calculation errors occur.
+    This thread handles API connections, data fetching, risk metric calculations, 
+    and running both Geometric Brownian Motion (GBM) and Merton Jump-Diffusion models 
+    to prevent blocking the main UI.
 
     Attributes:
-        years (int): The time horizon for the Monte Carlo projection.
-        simulations (int): The number of independent price paths to generate.
+        progress_update (Signal): Emits string updates about the current execution step.
+        data_fetched (Signal): Emits a dictionary containing the final simulation payloads and metrics.
+        error_occurred (Signal): Emits a string describing any exceptions caught during execution.
     """
+
     progress_update = Signal(str)
-    data_fetched = Signal(dict, float, float, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray) 
+    data_fetched = Signal(dict) 
     error_occurred = Signal(str)
 
     def __init__(self, years: int, simulations: int):
@@ -37,8 +31,8 @@ class SimulationWorker(QThread):
         Initializes the simulation worker.
 
         Args:
-            years (int): The duration of the simulation in years.
-            simulations (int): The total number of price paths to compute.
+            years (int): The time horizon for the simulation in years.
+            simulations (int): The number of simulation paths to generate.
         """
         super().__init__()
         self.years = years
@@ -46,11 +40,10 @@ class SimulationWorker(QThread):
 
     def run(self):
         """
-        Entry point for the QThread.
-
-        Wraps the asynchronous `run_simulation_tasks` coroutine in an `asyncio.run()` 
-        call, creating an isolated event loop for the network and processing tasks. 
-        Catches and emits any unhandled exceptions to prevent application crashes.
+        Executes the QThread. 
+        
+        Sets up the asyncio event loop to run the asynchronous simulation tasks 
+        and catches any top-level exceptions to emit via the error signal.
         """
         try:
             asyncio.run(self.run_simulation_tasks())
@@ -59,14 +52,17 @@ class SimulationWorker(QThread):
 
     async def run_simulation_tasks(self):
         """
-        Executes the sequential phases of data retrieval and calculation.
+        Asynchronously connects to the IBKR API, retrieves portfolio data, 
+        and executes the simulation pipelines.
 
-        Phase 1: Connects to IBKR and fetches current portfolio balances.
-        Phase 2: Downloads historical data and computes `mu` and `sigma`.
-        Phase 3: Executes the `MonteCarloSimulator` and calculates the 5th, 
-            50th, and 95th percentile paths using NumPy vectorized sorting.
+        Steps performed:
+        1. Connects to IBKR TWS/Gateway using credentials from the configuration file.
+        2. Fetches current summary, positions, and historical price data.
+        3. Calculates risk metrics separating cash and risky assets.
+        4. Runs both standard (GBM) and stress-test (Merton) simulations.
+        5. Calculates the 5th, 50th, and 95th percentiles for the generated paths.
+        6. Emits the formatted payload to the main UI.
         """
-
         host = read_json(PathManager.CONFIG_FILE, "IBKR_HOST") or '127.0.0.1'
         port = read_json(PathManager.CONFIG_FILE, "IBKR_PORT") or 4001
         client_id = read_json(PathManager.CONFIG_FILE, "IBKR_CLIENT_ID") or 1
@@ -80,36 +76,48 @@ class SimulationWorker(QThread):
             return
 
         try:
-            # ── PHASE 1 ───────────────────────────────────
             self.progress_update.emit("Fetching current portfolio...")
             await pm.fetch_summary_and_positions()
 
-            # ── PHASE 2 ───────────────────────────────────
             self.progress_update.emit("Downloading historical data for risk metrics...")
             historical_prices = await pm.fetch_historical_data()
 
-            self.progress_update.emit("Calculating risk metrics...")
-            mu, sigma = pm.calculate_risk_metrics(historical_prices)
-            capital = pm.total_value
+            self.progress_update.emit("Calculating separated risk metrics...")
+            metrics = pm.calculate_risk_metrics(historical_prices)
 
-            # ── PHASE 3 ───────────────────────────────────
-            self.progress_update.emit("Running initial Monte Carlo...")
-            scenarios, simulated_prices = pm.run_montecarlo_simulation(
+            self.progress_update.emit("Running GBM and MJD simulations...")
+            sim_results = pm.run_montecarlo_simulation(
+                metrics=metrics,
                 years=self.years,
                 simulations=self.simulations
             )
 
-            sims_transposed = simulated_prices.T
-            worst_line = np.percentile(sims_transposed, 5, axis=0)
-            median_line = np.percentile(sims_transposed, 50, axis=0)
-            best_line = np.percentile(sims_transposed, 95, axis=0)
-            time_steps = np.arange(sims_transposed.shape[1])
-            background_lines = sims_transposed[:100, :]
+            gbm_t = sim_results["gbm"]["prices"].T
+            gbm_data = {
+                "scenarios": sim_results["gbm"]["scenarios"],
+                "worst": np.percentile(gbm_t, 5, axis=0),
+                "median": np.percentile(gbm_t, 50, axis=0),
+                "best": np.percentile(gbm_t, 95, axis=0),
+                "background": gbm_t[:100, :]
+            }
 
-            self.data_fetched.emit(
-                scenarios, mu, sigma, capital, 
-                time_steps, worst_line, median_line, best_line, background_lines
-            )
+            merton_t = sim_results["merton"]["prices"].T
+            merton_data = {
+                "scenarios": sim_results["merton"]["scenarios"],
+                "worst": np.percentile(merton_t, 5, axis=0),
+                "median": np.percentile(merton_t, 50, axis=0),
+                "best": np.percentile(merton_t, 95, axis=0),
+                "background": merton_t[:100, :]
+            }
+
+            payload = {
+                "gbm": gbm_data,
+                "merton": merton_data,
+                "metrics": metrics,
+                "time_steps": np.arange(merton_t.shape[1])
+            }
+
+            self.data_fetched.emit(payload)
 
         except Exception as e:
             self.error_occurred.emit(f"Error during simulation: {str(e)}")
@@ -118,80 +126,89 @@ class SimulationWorker(QThread):
 
 class FastMathWorker(QThread):
     """
-    A lightweight thread for rapid Monte Carlo recalculations.
+    A lightweight background worker thread for recalculating simulations 
+    using pre-existing data.
 
-    Unlike the `SimulationWorker`, this thread does not make any network calls 
-    to IBKR. It utilizes cached portfolio metrics (capital, mu, sigma) to rapidly 
-    execute new Monte Carlo simulations when the user changes UI parameters 
-    (like 'Years' or 'Simulations'). It offloads the heavy `np.percentile` 
-    sorting from the main thread to maintain a 60 FPS UI experience.
-
-    Signals:
-        data_calculated (dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray):
-            Emitted when calculations are done. Payload includes: scenarios, 
-            time_steps, worst_line, median_line, best_line, background_lines.
-        error_occurred (str): Emitted if mathematical errors or memory issues occur.
+    Unlike `SimulationWorker`, this thread does not connect to IBKR. It performs 
+    fast mathematical recalculations of GBM and Merton models based on provided 
+    risk metrics, allowing for quick UI updates when simulation parameters change.
 
     Attributes:
-        capital (float): The cached starting portfolio value.
-        mu (float): The cached annualized expected return.
-        sigma (float): The cached annualized volatility.
-        years (int): The new time horizon to simulate.
-        simulations (int): The new number of paths to generate.
+        data_calculated (Signal): Emits a dictionary containing the updated simulation payloads.
+        error_occurred (Signal): Emits a string describing any exceptions caught during calculation.
     """
-    data_calculated = Signal(dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    data_calculated = Signal(dict)
     error_occurred = Signal(str)
 
-    def __init__(self, capital, mu, sigma, years, simulations):
+    def __init__(self, metrics: dict, years: int, simulations: int):
         """
-        Initializes the fast math worker with cached financial metrics.
+        Initializes the fast math worker.
 
         Args:
-            capital (float): Starting value of the portfolio.
-            mu (float): Annualized drift of the portfolio.
-            sigma (float): Annualized volatility of the portfolio.
-            years (int): Years to project forward.
-            simulations (int): Number of paths to simulate.
+            metrics (dict): A dictionary containing pre-calculated risk and portfolio metrics.
+            years (int): The time horizon for the simulation in years.
+            simulations (int): The number of simulation paths to generate.
         """
         super().__init__()
-        self.capital = capital
-        self.mu = mu
-        self.sigma = sigma
+        self.metrics = metrics
         self.years = years
         self.simulations = simulations
 
     def run(self):
         """
-        Executes the mathematical engine and processes the output arrays.
+        Executes the QThread.
 
-        Instantiates the `MonteCarloSimulator`, generates the raw price paths, 
-        and calculates the required percentiles (5%, 50%, 95%) across the entire 
-        matrix. It slices the first 100 paths for background visualization 
-        before emitting the prepared data back to the UI.
+        Performs the following steps natively in the thread:
+        1. Simulates purely risky capital paths using GBM and Merton Jump-Diffusion.
+        2. Calculates a deterministic growth matrix for cash/risk-free capital.
+        3. Merges the risky paths with the cash matrix.
+        4. Calculates percentiles and emits the payload back to the main thread.
         """
         try:
-            simulator = MonteCarloSimulator(
-                capital=self.capital,
-                mu=self.mu,
-                sigma=self.sigma,
-                years=self.years,
-                simulations=self.simulations
+            safe_capital = self.metrics["risky_capital"] if self.metrics["risky_capital"] > 0 else 1.0
+            
+            gbm_sim = GBMSimulator(safe_capital, self.metrics["risky_mu"], self.metrics["risky_vol"], self.years, self.simulations)
+            risky_gbm = gbm_sim.simulate()
+            if self.metrics["risky_capital"] <= 0: risky_gbm *= 0
+            
+            merton_sim = MJDSimulator(
+                safe_capital, self.metrics["risky_mu"], self.metrics["risky_vol"], 
+                self.years, self.simulations, self.metrics["lam"], self.metrics["m"], self.metrics["nu"]
             )
-            simulated_prices = simulator.simulate()
-            scenarios = simulator.get_scenarios(simulated_prices)
-            
-            sims_transposed = simulated_prices.T
-            
-            worst_line = np.percentile(sims_transposed, 5, axis=0)
-            median_line = np.percentile(sims_transposed, 50, axis=0)
-            best_line = np.percentile(sims_transposed, 95, axis=0)
-            
-            time_steps = np.arange(sims_transposed.shape[1])
-            
-            background_lines = sims_transposed[:100, :]
-            
-            self.data_calculated.emit(
-                scenarios, time_steps, worst_line, median_line, best_line, background_lines
-            )
+            risky_merton = merton_sim.simulate()
+            if self.metrics["risky_capital"] <= 0: risky_merton *= 0
+
+            dt = 1.0 / 252
+            steps = int(self.years * 252)
+            cash_growth = np.exp(self.metrics["risk_free_rate"] * dt * np.arange(steps + 1))
+            cash_matrix = (self.metrics["cash_capital"] * cash_growth).reshape(-1, 1)
+
+            total_gbm = risky_gbm + cash_matrix
+            total_merton = risky_merton + cash_matrix
+
+            gbm_t = total_gbm.T
+            gbm_data = {
+                "scenarios": gbm_sim.get_scenarios(total_gbm),
+                "worst": np.percentile(gbm_t, 5, axis=0),
+                "median": np.percentile(gbm_t, 50, axis=0),
+                "best": np.percentile(gbm_t, 95, axis=0),
+                "background": gbm_t[:100, :]
+            }
+
+            merton_t = total_merton.T
+            merton_data = {
+                "scenarios": merton_sim.get_scenarios(total_merton),
+                "worst": np.percentile(merton_t, 5, axis=0),
+                "median": np.percentile(merton_t, 50, axis=0),
+                "best": np.percentile(merton_t, 95, axis=0),
+                "background": merton_t[:100, :]
+            }
+
+            payload = {
+                "gbm": gbm_data,
+                "merton": merton_data,
+                "time_steps": np.arange(merton_t.shape[1])
+            }
+            self.data_calculated.emit(payload)
         except Exception as e:
             self.error_occurred.emit(f"Fast Math Error: {str(e)}")

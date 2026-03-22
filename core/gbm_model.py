@@ -2,7 +2,7 @@ import numpy as np
 
 TRADING_DAYS_PER_YEAR = 252
 
-class MonteCarloSimulator:
+class GBMSimulator:
     """
     Executes Monte Carlo simulations for financial portfolios using Geometric Brownian Motion (GBM).
 

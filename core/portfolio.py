@@ -2,9 +2,11 @@ from ib_async import *
 import pandas as pd
 import numpy as np
 import asyncio
-from core.montecarlo import MonteCarloSimulator
+from core.gbm_model import GBMSimulator
 from core.ai_review import get_portfolio_analysis
 from core.utils import read_json, format_json
+from core.path_manager import PathManager
+from core.merton_model import MJDSimulator
 
 class PortfolioManager:
     """
@@ -49,7 +51,6 @@ class PortfolioManager:
         self.client_id = client_id
         self.fx_cache = {}
 
-        # Portfolio state (populated in fetch_summary_and_positions)
         self.total_value = 0.0
         self.base_currency = ""
         self.cash_value_base = 0.0
@@ -58,7 +59,6 @@ class PortfolioManager:
         self.risky_assets = []
         self.weights_dict = {}
         
-        # Risk metrics (populated in calculate_risk_metrics)
         self.total_portfolio_mu = 0.0
         self.total_portfolio_vol = 0.0
 
@@ -276,21 +276,23 @@ class PortfolioManager:
         all_prices.dropna(inplace=True) 
         return all_prices
 
-    def calculate_risk_metrics(self, all_prices: pd.DataFrame) -> tuple:
+    def calculate_risk_metrics(self, all_prices: pd.DataFrame) -> dict:
         """
-        Calculates the portfolio's expected drift (mu) and volatility (sigma).
+        Calculates risk and return metrics for both the risky assets and the total portfolio.
 
-        Normalizes the weights of the risky assets, calculates the covariance 
-        matrix from daily returns, and computes the annualized metrics. It then 
-        adjusts these metrics based on the portfolio's cash buffer and the 
-        configured risk-free rate.
+        Extracts the covariance matrix, daily returns, and historical jumps from the 
+        provided price data. Computes standard metrics (annualized volatility and expected 
+        return) and Merton Jump-Diffusion parameters strictly on the at-risk capital, 
+        then blends them with risk-free cash rates.
 
         Args:
-            all_prices (pd.DataFrame): The historical price matrix generated 
-                by `fetch_historical_data`.
+            all_prices (pd.DataFrame): A date-indexed DataFrame containing daily 
+                closing prices for the portfolio's risky assets.
 
         Returns:
-            tuple: A tuple containing (total_portfolio_mu, total_portfolio_vol).
+            dict: A dictionary of compiled metrics including 'total_mu', 'total_vol', 
+                'risky_mu', 'risky_vol', jump parameters ('lam', 'm', 'nu'), and 
+                capital allocations ('risky_capital', 'cash_capital').
         """
         valid_symbols = all_prices.columns.tolist()
         
@@ -299,50 +301,100 @@ class PortfolioManager:
         ])
         
         all_returns = all_prices.pct_change().dropna()
-        cov_matrix = all_returns.cov()
         
+        cov_matrix = all_returns.cov()
         port_variance = np.dot(normalized_risky_weights.T, np.dot(cov_matrix.values, normalized_risky_weights))
         annual_volatility = self.get_annual_volatility(self.annualize(port_variance, self.TRADING_DAYS))
         
         mean_daily_returns = all_returns.mean()
         daily_mu = np.dot(normalized_risky_weights, mean_daily_returns.values)
-        annual_mu = daily_mu * self.TRADING_DAYS
+        risky_annual_mu = daily_mu * self.TRADING_DAYS
         
-        risk_free_rate = read_json("config.json", "RISK_FREE_RATE")
-        self.total_portfolio_mu = (annual_mu * self.sum_risky_weights) + (risk_free_rate * self.cash_weight) 
+        risk_free_rate = float(read_json(PathManager.CONFIG_FILE, "RISK_FREE_RATE") or 0.0)
+        self.total_portfolio_mu = (risky_annual_mu * self.sum_risky_weights) + (risk_free_rate * self.cash_weight) 
         self.total_portfolio_vol = annual_volatility * self.sum_risky_weights 
         
-        return self.total_portfolio_mu, self.total_portfolio_vol
+        portfolio_daily_returns = all_returns.dot(normalized_risky_weights)
+        daily_vol = portfolio_daily_returns.std()
+        
+        jump_multiplier = float(read_json(PathManager.CONFIG_FILE, "JUMP_THRESHOLD") or 3.0)
+        threshold = jump_multiplier * daily_vol
+        jumps = portfolio_daily_returns[abs(portfolio_daily_returns) > threshold]
+        
+        if len(jumps) > 0:
+            lam = (len(jumps) / len(portfolio_daily_returns)) * self.TRADING_DAYS
+            m = jumps.mean()
+            nu = jumps.std() if len(jumps) > 1 else 0.0
+            if np.isnan(nu): nu = 0.0
+        else:
+            lam, m, nu = 0.0, 0.0, 0.0
+            
+        return {
+            "total_mu": self.total_portfolio_mu,
+            "total_vol": self.total_portfolio_vol,
+            "risky_mu": risky_annual_mu,
+            "risky_vol": annual_volatility,
+            "lam": lam,
+            "m": m,
+            "nu": nu,
+            "risky_capital": self.total_value * self.sum_risky_weights,
+            "cash_capital": self.cash_value_base,
+            "risk_free_rate": risk_free_rate
+        }
 
-    # ── SIMULATION AND AI ────────────────────────────────
-    def run_montecarlo_simulation(self, years: int = 5, simulations: int = 100000) -> tuple:
+    def run_montecarlo_simulation(self, metrics: dict, years: int = 5, simulations: int = 100000) -> dict:
         """
-        Executes a Monte Carlo simulation using the calculated portfolio metrics.
+        Executes Monte Carlo simulations by mathematically separating at-risk capital from risk-free cash.
+
+        Runs standard Geometric Brownian Motion (GBM) and Merton Jump-Diffusion models 
+        exclusively on the risky capital portion of the portfolio. Simultaneously 
+        calculates deterministic growth for the cash allocation, and merges the paths 
+        to produce the final total portfolio simulation.
 
         Args:
-            years (int, optional): The time horizon to simulate. Defaults to 5.
-            simulations (int, optional): Number of random paths to generate. 
-                Defaults to 100,000.
+            metrics (dict): Risk metrics and capital allocations generated by `calculate_risk_metrics`.
+            years (int, optional): The time horizon for the simulation in years. Defaults to 5.
+            simulations (int, optional): The number of simulation paths to generate. Defaults to 100000.
 
         Returns:
-            tuple: A tuple containing:
-                - scenarios (dict): Calculated percentiles (Worst, Median, Best).
-                - simulated_prices (np.ndarray): The raw matrix of all simulated paths.
+            dict: A dictionary containing the computed scenario percentiles and the 
+                generated price paths for both 'gbm' and 'merton' models.
         """
-        simulator = MonteCarloSimulator(
-            capital=self.total_value, 
-            mu=self.total_portfolio_mu, 
-            sigma=self.total_portfolio_vol, 
-            years=years, 
-            simulations=simulations
+        safe_capital = metrics["risky_capital"] if metrics["risky_capital"] > 0 else 1.0
+        
+        gbm_simulator = GBMSimulator(
+            capital=safe_capital, mu=metrics["risky_mu"], sigma=metrics["risky_vol"], 
+            years=years, simulations=simulations
         )
-        simulated_prices = simulator.simulate()
-        scenarios = simulator.get_scenarios(simulated_prices)
+        risky_gbm_prices = gbm_simulator.simulate()
+        if metrics["risky_capital"] <= 0: risky_gbm_prices *= 0
+
+        merton_simulator = MJDSimulator(
+            capital=safe_capital, mu=metrics["risky_mu"], sigma=metrics["risky_vol"], 
+            years=years, simulations=simulations,
+            lam=metrics["lam"], m=metrics["m"], nu=metrics["nu"]
+        )
+        risky_merton_prices = merton_simulator.simulate()
+        if metrics["risky_capital"] <= 0: risky_merton_prices *= 0
+
+        dt = 1.0 / self.TRADING_DAYS
+        steps = int(years * self.TRADING_DAYS)
+        cash_growth = np.exp(metrics["risk_free_rate"] * dt * np.arange(steps + 1))
+        cash_matrix = (metrics["cash_capital"] * cash_growth).reshape(-1, 1)
+
+        total_gbm_prices = risky_gbm_prices + cash_matrix
+        total_merton_prices = risky_merton_prices + cash_matrix
         
-        # Visualization (can be disconnected when you use a Qt canvas)
-        #plot_portfolio_montecarlo(simulated_prices)
-        
-        return scenarios, simulated_prices
+        return {
+            "gbm": {
+                "scenarios": gbm_simulator.get_scenarios(total_gbm_prices),
+                "prices": total_gbm_prices
+            },
+            "merton": {
+                "scenarios": merton_simulator.get_scenarios(total_merton_prices),
+                "prices": total_merton_prices
+            }
+        }
 
     def get_ai_feedback(self, scenarios: dict) -> dict:
         """
