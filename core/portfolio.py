@@ -245,32 +245,42 @@ class PortfolioManager:
         """
         Downloads 5 years of daily adjusted closing prices for all risky assets.
 
-        Qualifies the contracts with IBKR, fetches the data sequentially (with 
-        pacing to respect API rate limits), and aligns everything into a single, 
-        forward-filled Pandas DataFrame.
+        Qualifies the contracts with IBKR, fetches the data concurrently (using 
+        asyncio.gather and a Semaphore to respect API rate limits), and aligns 
+        everything into a single, forward-filled Pandas DataFrame.
 
         Returns:
-            pd.DataFrame: A date-indexed DataFrame where each column represents 
+        pd.DataFrame: A date-indexed DataFrame where each column represents 
                 a ticker symbol and rows are daily adjusted close prices.
         """
         all_prices = pd.DataFrame()
-        
-        for item in self.risky_assets:
-            symbol = item.contract.symbol
-            await self.ib.qualifyContractsAsync(item.contract)
-            
-            bars = await self.ib.reqHistoricalDataAsync(
-                item.contract, endDateTime='', durationStr='5 Y',
-                barSizeSetting='1 day', whatToShow='ADJUSTED_LAST', useRTH=True
-            )
-            
-            if bars:
-                df = util.df(bars)
-                df['date'] = pd.to_datetime(df['date']).dt.normalize()
-                df.set_index('date', inplace=True) 
-                all_prices = all_prices.join(df['close'].rename(symbol), how='outer')
+        semaphore = asyncio.Semaphore(5) # Limits to 5 concurrent IBKR requests
+
+        async def fetch_single_asset(item):
+            async with semaphore:
+                symbol = item.contract.symbol
+                await self.ib.qualifyContractsAsync(item.contract)
                 
-            await asyncio.sleep(1) # Pacing to respect IBKR API limits
+                bars = await self.ib.reqHistoricalDataAsync(
+                    item.contract, endDateTime='', durationStr='5 Y',
+                    barSizeSetting='1 day', whatToShow='ADJUSTED_LAST', useRTH=True
+                )
+                
+                await asyncio.sleep(0.5)
+                
+                if bars:
+                    df = util.df(bars)
+                    df['date'] = pd.to_datetime(df['date']).dt.normalize()
+                    df.set_index('date', inplace=True) 
+                    return symbol, df['close']
+                return symbol, None
+
+        tasks = [fetch_single_asset(item) for item in self.risky_assets]
+        results = await asyncio.gather(*tasks)
+
+        for symbol, close_series in results:
+            if close_series is not None:
+                all_prices = all_prices.join(close_series.rename(symbol), how='outer')
 
         all_prices.ffill(inplace=True) 
         all_prices.dropna(inplace=True) 
