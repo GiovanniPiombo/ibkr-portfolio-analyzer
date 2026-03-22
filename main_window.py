@@ -2,13 +2,13 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QStackedWidget, QLabel
 from PySide6.QtCore import Qt
 
-# Import the pages
 from pages.settings_page import SettingsPage
 from pages.dashboard_page import DashboardPage
 from pages.simulation_page import SimulationPage
 from pages.ai_page import AIPage
 from core.utils import read_json
 from core.path_manager import PathManager
+from pages.optimization_page import OptimizationPage
 
 class MainWindow(QMainWindow):
     """
@@ -76,8 +76,12 @@ class MainWindow(QMainWindow):
         self.btn_settings = QPushButton("Settings")
         self.btn_settings.setCheckable(True)
 
+        self.btn_optimization = QPushButton("Optimization")
+        self.btn_optimization.setCheckable(True)
+
         sidebar_layout.addWidget(self.btn_dashboard)
         sidebar_layout.addWidget(self.btn_simulation)
+        sidebar_layout.addWidget(self.btn_optimization)
         sidebar_layout.addWidget(self.btn_ai)
         sidebar_layout.addWidget(self.btn_settings)
         sidebar_layout.addStretch()
@@ -91,9 +95,11 @@ class MainWindow(QMainWindow):
         self.simulation_page = SimulationPage()
         self.ai_page = AIPage()
         self.settings_page = SettingsPage()
+        self.optimization_page = OptimizationPage()
 
         self.stacked_widget.addWidget(self.dashboard_page)
         self.stacked_widget.addWidget(self.simulation_page)
+        self.stacked_widget.addWidget(self.optimization_page)
         self.stacked_widget.addWidget(self.ai_page)
         self.stacked_widget.addWidget(self.settings_page)
 
@@ -104,8 +110,9 @@ class MainWindow(QMainWindow):
         # ── Sidebar Navigation Signals ─────────────────────────────
         self.btn_dashboard.clicked.connect(lambda: self.switch_page(0, self.btn_dashboard))
         self.btn_simulation.clicked.connect(lambda: self.switch_page(1, self.btn_simulation))
-        self.btn_ai.clicked.connect(lambda: self.switch_page(2, self.btn_ai))
-        self.btn_settings.clicked.connect(lambda: self.switch_page(3, self.btn_settings))
+        self.btn_optimization.clicked.connect(lambda: self.switch_page(2, self.btn_optimization))
+        self.btn_ai.clicked.connect(lambda: self.switch_page(3, self.btn_ai))
+        self.btn_settings.clicked.connect(lambda: self.switch_page(4, self.btn_settings))
 
         # ── Navigation and Data Flow Signals from Pages ─────────────────────────────
         self.dashboard_page.dashboard_refreshed.connect(self.on_dashboard_ready)
@@ -116,7 +123,7 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentIndex(index)
         
         # Uncheck all buttons except the active one
-        for btn in [self.btn_dashboard, self.btn_simulation, self.btn_ai, self.btn_settings]:
+        for btn in [self.btn_dashboard, self.btn_simulation, self.btn_ai, self.btn_settings, self.btn_optimization]:
             if btn != active_button:
                 btn.setChecked(False)
         active_button.setChecked(True)
@@ -140,6 +147,11 @@ class MainWindow(QMainWindow):
         self.shared_portfolio_data["language"] = ai_language
         
         self.ai_page.set_portfolio_data(self.shared_portfolio_data)
+
+        self.optimization_page.set_data(
+        self.shared_portfolio_data.get("metrics", {}), 
+        self.shared_portfolio_data.get("positions", [])
+)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

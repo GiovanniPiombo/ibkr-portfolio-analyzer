@@ -293,16 +293,18 @@ class PortfolioManager:
         Extracts the covariance matrix, daily returns, and historical jumps from the 
         provided price data. Computes standard metrics (annualized volatility and expected 
         return) and Merton Jump-Diffusion parameters strictly on the at-risk capital, 
-        then blends them with risk-free cash rates.
+        then blends them with risk-free cash rates. 
+        It also exports individual asset returns and the covariance matrix for 
+        Markowitz Portfolio Optimization.
 
         Args:
             all_prices (pd.DataFrame): A date-indexed DataFrame containing daily 
                 closing prices for the portfolio's risky assets.
 
         Returns:
-            dict: A dictionary of compiled metrics including 'total_mu', 'total_vol', 
-                'risky_mu', 'risky_vol', jump parameters ('lam', 'm', 'nu'), and 
-                capital allocations ('risky_capital', 'cash_capital').
+            dict: A dictionary of compiled metrics including total portfolio stats, 
+                MJD jump parameters, capital allocations, and individual asset 
+                metrics ('asset_returns', 'cov_matrix', 'symbols') for optimization.
         """
         valid_symbols = all_prices.columns.tolist()
         
@@ -339,6 +341,9 @@ class PortfolioManager:
         else:
             lam, m, nu = 0.0, 0.0, 0.0
             
+        annual_asset_returns = mean_daily_returns * self.TRADING_DAYS
+        annual_cov_matrix = cov_matrix * self.TRADING_DAYS
+
         return {
             "total_mu": self.total_portfolio_mu,
             "total_vol": self.total_portfolio_vol,
@@ -349,7 +354,10 @@ class PortfolioManager:
             "nu": nu,
             "risky_capital": self.total_value * self.sum_risky_weights,
             "cash_capital": self.cash_value_base,
-            "risk_free_rate": risk_free_rate
+            "risk_free_rate": risk_free_rate,
+            "asset_returns": annual_asset_returns.to_dict(),
+            "cov_matrix": annual_cov_matrix.to_dict(),
+            "symbols": valid_symbols
         }
 
     def run_montecarlo_simulation(self, metrics: dict, years: int = 5, simulations: int = 100000) -> dict:

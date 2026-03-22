@@ -300,5 +300,6 @@ class SimulationPage(QWidget):
             "sigma": self.cached_metrics["total_vol"] * 100,
             "worst_case": scenarios["Worst (5%)"],
             "median_case": scenarios["Median (50%)"],
-            "best_case": scenarios["Best (95%)"]
+            "best_case": scenarios["Best (95%)"],
+            "metrics": self.cached_metrics
         }
