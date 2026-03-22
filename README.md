@@ -48,7 +48,8 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 │
 ├── core/                         # PURE BUSINESS LOGIC: No Qt dependencies. Can be tested independently.
 │   ├── portfolio.py              # PortfolioManager: The brain of the app. Manages IBKR connection, fetches data, calculates risk metrics (mu, sigma), and integrates all core functions.
-│   ├── montecarlo.py             # MonteCarloSimulator: The mathematical engine. Runs vectorized GBM simulations using NumPy.
+│   ├── gbm_model.py              # GBMSimulator: The mathematical engine. Runs vectorized GBM simulations using NumPy.
+│   ├── merton_model.py           # MJDSimulator: The mathematical engine. Runs vectorized MJD simulations using NumPy.
 │   ├── ai_review.py              # Handles prompting and communication with the Google Gemini API.
 │   ├── graph.py                  # Standalone plotting functions (used for debugging, as the UI uses its own canvas).
 │   ├── path_manager.py           # Centralized path management for assets, configs, and prompts across the application.
@@ -56,7 +57,8 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 │
 ├── tests/                        # UNIT TESTS
 │   ├── conftest.py               # Pytest configuration and fixtures
-│   └── test_montecarlo.py        # Pytest suite for the MonteCarloSimulator, testing edge cases and statistical properties.
+│   ├── test_gbm.py               # Pytest suite for the GBMSimulator, testing edge cases and statistical properties.
+│   └── test_merton_model.py      # Pytest suite for the MJDSimulator, testing edge cases and statistical properties.
 │
 ├── assets/                       # ASSETS
 │   ├── Icon.ico                  # Application icon (Windows .ico format)
