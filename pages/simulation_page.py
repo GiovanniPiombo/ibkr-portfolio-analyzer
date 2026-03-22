@@ -186,12 +186,12 @@ class SimulationPage(QWidget):
                 'merton', and 'time_steps' data from the simulation.
         """
         self.cached_metrics = payload["metrics"]
-        
         self.cached_gbm_data = payload["gbm"]
         self.cached_merton_data = payload["merton"]
         self.time_steps = payload["time_steps"]
         
         self.update_view()
+        self.simulation_finished.emit(self.get_sim_data())
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run Simulation")
 
@@ -203,13 +203,9 @@ class SimulationPage(QWidget):
         using the currently selected model (Standard GBM or Merton Stress Test). 
         Finally, emits the updated data via the `simulation_finished` signal.
         """
-        if not self.cached_gbm_data or not self.cached_merton_data:
+        active_data = self.get_active_data()
+        if not active_data:
             return
-
-        if self.combo_model.currentText() == "Standard GBM":
-            active_data = self.cached_gbm_data
-        else:
-            active_data = self.cached_merton_data
 
         scenarios = active_data["scenarios"]
         
@@ -225,16 +221,6 @@ class SimulationPage(QWidget):
             active_data["best"], 
             active_data["background"]
         )
-        
-        sim_data = {
-            "total_value": self.cached_metrics["risky_capital"] + self.cached_metrics["cash_capital"],
-            "mu": self.cached_metrics["total_mu"] * 100,
-            "sigma": self.cached_metrics["total_vol"] * 100,
-            "worst_case": scenarios["Worst (5%)"],
-            "median_case": scenarios["Median (50%)"],
-            "best_case": scenarios["Best (95%)"]
-        }
-        self.simulation_finished.emit(sim_data)
 
     def on_fast_math_complete(self, payload):
         """Callback executed upon completion of the FastMathWorker calculations."""
@@ -243,7 +229,7 @@ class SimulationPage(QWidget):
         self.time_steps = payload["time_steps"]
         
         self.update_view()
-        
+        self.simulation_finished.emit(self.get_sim_data())
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run Simulation")
 
@@ -291,3 +277,28 @@ class SimulationPage(QWidget):
         self.fast_worker.error_occurred.connect(self.on_simulation_error)
         
         self.fast_worker.start()
+    
+    def get_active_data(self):
+        """Returns the data block for the currently selected model."""
+        if not self.cached_gbm_data or not self.cached_merton_data:
+            return None
+            
+        if self.combo_model.currentText() == "Standard GBM":
+            return self.cached_gbm_data
+        return self.cached_merton_data
+
+    def get_sim_data(self):
+        """Compiles and returns the current simulation results as a dictionary."""
+        active_data = self.get_active_data()
+        if not active_data or not getattr(self, "cached_metrics", None):
+            return {}
+
+        scenarios = active_data["scenarios"]
+        return {
+            "total_value": self.cached_metrics["risky_capital"] + self.cached_metrics["cash_capital"],
+            "mu": self.cached_metrics["total_mu"] * 100,
+            "sigma": self.cached_metrics["total_vol"] * 100,
+            "worst_case": scenarios["Worst (5%)"],
+            "median_case": scenarios["Median (50%)"],
+            "best_case": scenarios["Best (95%)"]
+        }
