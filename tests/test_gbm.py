@@ -1,11 +1,11 @@
 import pytest
 import numpy as np
-from montecarlo import MonteCarloSimulator
+from gbm_model import GBMSimulator
 
 # We use a fixture to create a baseline simulator to reuse across tests
 @pytest.fixture
 def default_simulator():
-    return MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=2, simulations=100)
+    return GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=2, simulations=100)
 
 # ── Initialization Test ───────────────────────────────────────
 def test_initialization(default_simulator):
@@ -28,19 +28,19 @@ def test_day_zero_capital(default_simulator):
 
 # ── Deterministic Behavior Test ───────────────────────────────
 def test_zero_volatility():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.0, years=1, simulations=10)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.0, years=1, simulations=10)
     prices = sim.simulate()
     expected_final_price = 1000.0 * np.exp(0.05 * 1)
     assert np.allclose(prices[-1, :], expected_final_price)
 
 def test_zero_drift_and_volatility():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.0, sigma=0.0, years=1, simulations=10)
+    sim = GBMSimulator(capital=1000.0, mu=0.0, sigma=0.0, years=1, simulations=10)
     prices = sim.simulate()
     assert np.all(prices == 1000.0)
 
 # ── Scenario Calculation Test ─────────────────────────────────
 def test_get_scenarios():
-    sim = MonteCarloSimulator(capital=100.0, mu=0.05, sigma=0.2, years=1)
+    sim = GBMSimulator(capital=100.0, mu=0.05, sigma=0.2, years=1)
     mock_prices = np.zeros((10, 100))
     mock_prices[-1, :] = np.arange(1, 101) 
     scenarios = sim.get_scenarios(mock_prices)
@@ -50,7 +50,7 @@ def test_get_scenarios():
 
 # ── Reproducibility Test (SEED) ───────────────────────────────
 def test_reproducibility():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=10)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=10)
 
     np.random.seed(42)
     prices_run_1 = sim.simulate()
@@ -64,29 +64,29 @@ def test_reproducibility():
 
 def test_negative_capital():
     with pytest.raises(ValueError):
-        MonteCarloSimulator(capital=-1000.0, mu=0.05, sigma=0.2, years=1)
+        GBMSimulator(capital=-1000.0, mu=0.05, sigma=0.2, years=1)
 
 def test_negative_sigma():
     with pytest.raises(ValueError):
-        MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=-0.2, years=1)
+        GBMSimulator(capital=1000.0, mu=0.05, sigma=-0.2, years=1)
 
 def test_negative_years():
     with pytest.raises(ValueError):
-        MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=-1)
+        GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=-1)
 
 # ── Boundary / Limit Parameters tests ─────────────────────────
 
 def test_zero_simulations():
     with pytest.raises(ValueError):
-        MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=0)
+        GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=0)
 
 def test_one_simulation():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=1)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=1)
     prices = sim.simulate()
     assert prices.shape == (253, 1)
 
 def test_zero_years():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=0, simulations=10)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=0, simulations=10)
     prices = sim.simulate()
     
     assert prices.shape == (1, 10)
@@ -95,7 +95,7 @@ def test_zero_years():
 # ── Extreme Values Test ───────────────────────────────────────
 
 def test_extreme_volatility():
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.8, years=10, simulations=100)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.8, years=10, simulations=100)
     prices = sim.simulate()
     
     assert not np.isnan(prices).any(), "Simulation contains NaN values."
@@ -106,7 +106,7 @@ def test_extreme_volatility():
 def test_statistical_expected_value():
     # The theoretical expected value of Geometric Brownian Motion is E[S_T] = S_0 * exp(mu * T)
     # We use a large number of simulations to satisfy the Law of Large Numbers
-    sim = MonteCarloSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=50000)
+    sim = GBMSimulator(capital=1000.0, mu=0.05, sigma=0.2, years=1, simulations=50000)
     
     np.random.seed(42)
     prices = sim.simulate()
