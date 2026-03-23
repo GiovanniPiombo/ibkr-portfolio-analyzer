@@ -1,7 +1,5 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QPushButton, QTableWidget, QTableWidgetItem, 
-                               QHeaderView, QFrame, QMessageBox)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QMessageBox
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from workers.optimization_thread import OptimizationWorker
 from components.markowitz_chart import MarkowitzChartView
@@ -15,6 +13,8 @@ class OptimizationPage(QWidget):
     assets (like broad-market ETFs) to their current weight, forcing the 
     mathematical optimizer to only reallocate the remaining "satellite" positions.
     """
+    optimization_started = Signal()
+    optimization_finished = Signal(dict)
     def __init__(self):
         """
         Initializes the OptimizationPage and sets up the blank UI state.
@@ -195,6 +195,8 @@ class OptimizationPage(QWidget):
         if not self.metrics or not self.positions:
             QMessageBox.warning(self, "Data Missing", "Please wait for IBKR data to finish loading in the Dashboard.")
             return
+    
+        self.optimization_started.emit()
 
         self.run_btn.setEnabled(False)
         self.run_btn.setText("Optimizing...")
@@ -258,6 +260,8 @@ class OptimizationPage(QWidget):
             elif "Sell" in action: action_item.setForeground(QColor("#E05252"))
             elif "Locked" in action: action_item.setForeground(QColor("#C8D0DC"))
             self.delta_table.setItem(row, 4, action_item)
+        
+        self.optimization_finished.emit(payload)
 
     def on_error(self, error_msg):
         """
@@ -270,4 +274,5 @@ class OptimizationPage(QWidget):
         """
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run Optimization")
+        self.optimization_finished.emit()
         QMessageBox.critical(self, "Optimization Error", str(error_msg))

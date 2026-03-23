@@ -118,6 +118,21 @@ class MainWindow(QMainWindow):
         self.dashboard_page.dashboard_refreshed.connect(self.on_dashboard_ready)
         self.simulation_page.simulation_finished.connect(self.on_simulation_ready)
 
+        # ── DASHBOARD LOCKING CONTROLS ─────────────────────────
+        self.simulation_page.simulation_started.connect(
+            lambda: self.dashboard_page.set_refresh_enabled(False, "Simulating...")
+        )
+        self.simulation_page.simulation_finished.connect(
+            lambda _: self.dashboard_page.set_refresh_enabled(True)
+        )
+
+        self.optimization_page.optimization_started.connect(
+            lambda: self.dashboard_page.set_refresh_enabled(False, "Optimizing...")
+        )
+        self.optimization_page.optimization_finished.connect(
+            lambda _: self.dashboard_page.set_refresh_enabled(True)
+        )
+
     def switch_page(self, index, active_button):
         """Switches the visible page and updates sidebar button states."""
         self.stacked_widget.setCurrentIndex(index)

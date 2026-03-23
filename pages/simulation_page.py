@@ -18,6 +18,7 @@ class SimulationPage(QWidget):
         cached_sigma (float): The volatility calculated from historical data.
         cached_capital (float): The initial investment amount to simulate.
     """
+    simulation_started = Signal()
     simulation_finished = Signal(dict)
     def __init__(self):
         """
@@ -159,6 +160,7 @@ class SimulationPage(QWidget):
         if not self.run_btn.isEnabled():
             return
             
+        self.simulation_started.emit()
         print("[UI DEBUG] Starting background Monte Carlo preload...")
         self.run_btn.setEnabled(False)
         self.run_btn.setText("Preloading in background...")
@@ -245,6 +247,7 @@ class SimulationPage(QWidget):
         """
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run Simulation")
+        self.simulation_finished.emit({})
         QMessageBox.critical(self, "Simulation Error", f"An error occurred:\n{error_msg}")
 
     def on_run_clicked(self):
@@ -255,6 +258,8 @@ class SimulationPage(QWidget):
         if getattr(self, "cached_metrics", None) is None:
             self.run_btn.setText("Still downloading background data...")
             return
+        
+        self.simulation_started.emit()
             
         # ── UI Updates ───────────────────────────────────────────
         self.run_btn.setEnabled(False)

@@ -236,3 +236,14 @@ class DashboardPage(QWidget):
         self.refresh_btn.setEnabled(True)
         self.refresh_btn.setText("Refresh IBKR Data")
         QMessageBox.critical(self, "IBKR Error", f"An error occurred:\n{error_msg}")
+    
+    def set_refresh_enabled(self, is_enabled: bool, message: str = None):
+        """
+        Enables or disables the refresh button from the outside.
+        Useful for locking the UI when other pages are processing data.
+        """
+        self.refresh_btn.setEnabled(is_enabled)
+        if is_enabled:
+            self.refresh_btn.setText("Refresh IBKR Data")
+        else:
+            self.refresh_btn.setText(message if message else "Processing...")
