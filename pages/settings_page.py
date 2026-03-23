@@ -76,13 +76,18 @@ class SettingsPage(QWidget):
         self.risk_free_input.setSuffix(" %")
 
         self.pacing_limit = QSpinBox()
-        self.pacing_limit.setRange(1, 20.0)
+        self.pacing_limit.setRange(1, 20)
+
+        self.lookback_period = QSpinBox()
+        self.lookback_period.setRange(1, 20.0)
+        self.lookback_period.setSuffix(" Years")
 
         form_layout.addRow(QLabel("Gemini API Key:"), self.api_key_input)
         form_layout.addRow(QLabel("AI Model:"), self.model_input)
         form_layout.addRow(QLabel("AI Output Language:"), self.language_input)
         form_layout.addRow(QLabel("Risk-Free Rate:"), self.risk_free_input)
         form_layout.addRow(QLabel("Pacing Limit:"), self.pacing_limit)
+        form_layout.addRow(QLabel("Lookback Period:"), self.lookback_period)
 
         # ─── Monte Carlo Defaults ──────────────────────────────────────
         mc_section = QLabel("MONTE CARLO DEFAULTS")
@@ -158,6 +163,7 @@ class SettingsPage(QWidget):
             self.language_input.setCurrentText(config.get("AI_LANGUAGE", "English"))
             self.risk_free_input.setValue(config.get("RISK_FREE_RATE", 0.0) * 100)
             self.pacing_limit.setValue(config.get("PACING_LIMIT", 5))
+            self.lookback_period.setValue(config.get("LOOKBACK_PERIOD", 5))
             
             self.mc_years_input.setValue(config.get("DEFAULT_YEARS", 5))
             self.mc_sims_input.setCurrentText(str(config.get("DEFAULT_SIMS", 10000)))
@@ -187,7 +193,9 @@ class SettingsPage(QWidget):
         config["AI_LANGUAGE"] = self.language_input.currentText()
         config["RISK_FREE_RATE"] = round(self.risk_free_input.value() / 100.0, 4)
         config["PACING_LIMIT"] = self.pacing_limit.value()
+        config["LOOKBACK_PERIOD"] = self.lookback_period.value()
         
+        config["LOOK"] = self.mc_years_input.value()
         config["DEFAULT_YEARS"] = self.mc_years_input.value()
         config["DEFAULT_SIMS"] = int(self.mc_sims_input.currentText())
         config["JUMP_THRESHOLD"] = round(self.jump_threshold_input.value(), 2)

@@ -262,7 +262,7 @@ class PortfolioManager:
                 await self.ib.qualifyContractsAsync(item.contract)
                 
                 bars = await self.ib.reqHistoricalDataAsync(
-                    item.contract, endDateTime='', durationStr='5 Y',
+                    item.contract, endDateTime='', durationStr=str(read_json(PathManager.CONFIG_FILE, "LOOKBACK_PERIOD")) + " Y",
                     barSizeSetting='1 day', whatToShow='ADJUSTED_LAST', useRTH=True
                 )
                 
