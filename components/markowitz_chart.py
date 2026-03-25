@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QColor, QPen, QPainter
+from PySide6.QtGui import QColor, QPen, QPainter, QCursor
+from PySide6.QtWidgets import QToolTip
 from PySide6.QtCharts import QChart, QChartView, QSplineSeries, QScatterSeries, QValueAxis
 
 class MarkowitzChartView(QChartView):
@@ -24,7 +25,6 @@ class MarkowitzChartView(QChartView):
         self.chart.setBackgroundRoundness(0)
 
         self.setRenderHint(QPainter.Antialiasing)
-        self.setRubberBand(QChartView.RectangleRubberBand)
         
         self.axis_x = None
         self.axis_y = None
@@ -51,11 +51,14 @@ class MarkowitzChartView(QChartView):
         x_vals = []
         y_vals = []
         for pt in frontier_points:
-            x_vals.append(pt["volatility"] * 100)
-            y_vals.append(pt["return"] * 100)
-            curve_series.append(QPointF(pt["volatility"] * 100, pt["return"] * 100))
+            vol = pt["volatility"] * 100
+            ret = pt["return"] * 100
+            x_vals.append(vol)
+            y_vals.append(ret)
+            curve_series.append(QPointF(vol, ret))
             
         self.chart.addSeries(curve_series)
+        curve_series.hovered.connect(lambda point, state: self._handle_hover(point, state, "Efficient Frontier"))
 
         current_series = QScatterSeries()
         current_series.setName("Current Portfolio")
@@ -69,7 +72,9 @@ class MarkowitzChartView(QChartView):
         current_series.append(QPointF(curr_x, curr_y))
         x_vals.append(curr_x)
         y_vals.append(curr_y)
+        
         self.chart.addSeries(current_series)
+        current_series.hovered.connect(lambda point, state: self._handle_hover(point, state, "Current Portfolio"))
 
         optimal_series = QScatterSeries()
         optimal_series.setName("Max Sharpe (Optimal)")
@@ -84,6 +89,7 @@ class MarkowitzChartView(QChartView):
         x_vals.append(opt_x)
         y_vals.append(opt_y)
         self.chart.addSeries(optimal_series)
+        optimal_series.hovered.connect(lambda point, state: self._handle_hover(point, state, "Max Sharpe (Optimal)"))
 
         min_x, max_x = min(x_vals), max(x_vals)
         min_y, max_y = min(y_vals), max(y_vals)
@@ -115,3 +121,23 @@ class MarkowitzChartView(QChartView):
             series.attachAxis(self.axis_y)
 
         self.chart.setTitle("Markowitz Efficient Frontier")
+
+    def _handle_hover(self, point: QPointF, state: bool, series_name: str):
+        """
+        Handles the hover event over the frontier curve or portfolio scatter points.
+        Displays a native tooltip showing the exact Risk and Return percentages.
+        
+        Args:
+            point (QPointF): The exact point (x, y) on the chart that is being hovered.
+            state (bool): True if the mouse cursor entered the item area, False if it left.
+            series_name (str): The name of the series being hovered to display in bold.
+        """
+        if state:
+            risk = point.x()
+            expected_return = point.y()
+            
+            tooltip_text = f"<b>{series_name}</b><br>Risk: {risk:.2f}%<br>Return: {expected_return:.2f}%"
+            
+            QToolTip.showText(QCursor.pos(), tooltip_text, self)
+        else:
+            QToolTip.hideText()
