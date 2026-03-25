@@ -1,3 +1,4 @@
+import os
 from ib_async import *
 import pandas as pd
 import numpy as np
@@ -8,6 +9,7 @@ from core.utils import read_json, format_json
 from core.path_manager import PathManager
 from core.merton_model import MJDSimulator
 from core.logger import app_logger
+from datetime import datetime
 
 class PortfolioManager:
     """
@@ -260,20 +262,57 @@ class PortfolioManager:
         }
     
     # ── HISTORICAL DATA AND MATH ─────────────────────────
-    async def fetch_historical_data(self) -> pd.DataFrame:
+    async def fetch_historical_data(self, cache_file: str = "data/historical_prices_cache.parquet") -> pd.DataFrame:
         """
-        Downloads 5 years of daily adjusted closing prices for all risky assets.
+        Downloads daily adjusted closing prices for all risky assets, utilizing local caching 
+        to minimize IBKR API requests and prevent pacing violations.
 
-        Qualifies the contracts with IBKR, fetches the data concurrently (using 
-        asyncio.gather and a Semaphore to respect API rate limits), and aligns 
-        everything into a single, forward-filled Pandas DataFrame.
+        It checks for a local parquet file. If the portfolio composition has changed, 
+        or if no cache exists, it fetches the full lookback period. If the cache is valid, 
+        it intelligently fetches only the missing days and merges them.
+
+        Args:
+            cache_file (str): The local path where the historical data dataframe is saved.
 
         Returns:
-        pd.DataFrame: A date-indexed DataFrame where each column represents 
+            pd.DataFrame: A date-indexed DataFrame where each column represents 
                 a ticker symbol and rows are daily adjusted close prices.
         """
         all_prices = pd.DataFrame()
-        semaphore = asyncio.Semaphore(read_json(PathManager.CONFIG_FILE, "PACING_LIMIT") or 5) # Limits to concurrent IBKR requests
+        cached_df = pd.DataFrame()
+        
+        lookback_years = str(read_json(PathManager.CONFIG_FILE, "LOOKBACK_PERIOD") or 5)
+        duration_str = f"{lookback_years} Y"
+        
+        current_symbols = [item.contract.symbol for item in self.risky_assets]
+
+        if os.path.exists(cache_file):
+            try:
+                cached_df = pd.read_parquet(cache_file)
+                if not cached_df.empty:
+                    cached_symbols = cached_df.columns.tolist()
+                    missing_symbols = [sym for sym in current_symbols if sym not in cached_symbols]
+                    
+                    if missing_symbols:
+                        app_logger.info(f"New assets detected: {missing_symbols}. Forcing full historical fetch.")
+                        cached_df = pd.DataFrame()
+                    else:
+                        last_date = cached_df.index.max().date()
+                        today = datetime.now().date()
+                        days_missing = (today - last_date).days
+                        
+                        if days_missing <= 0:
+                            app_logger.info("Historical data is up to date. Loading entirely from local cache.")
+                            return cached_df
+                        
+                        # Add a 2-day buffer to ensure overlapping and avoid missing any data points
+                        duration_str = f"{days_missing + 2} D"
+                        app_logger.info(f"Cache found. Fetching only the last {duration_str}")
+            except Exception as e:
+                app_logger.error(f"Failed to read cache file: {e}. Proceeding with full download.")
+                cached_df = pd.DataFrame()
+
+        semaphore = asyncio.Semaphore(read_json(PathManager.CONFIG_FILE, "PACING_LIMIT") or 5)
 
         async def fetch_single_asset(item):
             async with semaphore:
@@ -281,7 +320,7 @@ class PortfolioManager:
                 await self.ib.qualifyContractsAsync(item.contract)
                 
                 bars = await self.ib.reqHistoricalDataAsync(
-                    item.contract, endDateTime='', durationStr=str(read_json(PathManager.CONFIG_FILE, "LOOKBACK_PERIOD")) + " Y",
+                    item.contract, endDateTime='', durationStr=duration_str,
                     barSizeSetting='1 day', whatToShow='ADJUSTED_LAST', useRTH=True
                 )
                 
@@ -303,8 +342,22 @@ class PortfolioManager:
             if close_series is not None:
                 all_prices = all_prices.join(close_series.rename(symbol), how='outer')
 
-        all_prices.ffill(inplace=True) 
-        all_prices.dropna(inplace=True) 
+        if not cached_df.empty and not all_prices.empty:
+            all_prices = pd.concat([cached_df, all_prices])
+            all_prices = all_prices[~all_prices.index.duplicated(keep='last')]
+            all_prices.sort_index(inplace=True)
+        elif not cached_df.empty and all_prices.empty:
+            all_prices = cached_df
+
+        if not all_prices.empty:
+            all_prices.ffill(inplace=True) 
+            all_prices.dropna(inplace=True) 
+            
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+
+            all_prices.to_parquet(cache_file)
+            app_logger.info("Historical prices cache updated successfully.")
+
         return all_prices
 
     def calculate_risk_metrics(self, all_prices: pd.DataFrame) -> dict:
