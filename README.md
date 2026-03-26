@@ -3,12 +3,13 @@
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/GUI-PySide6-green)]()
 [![IBKR](https://img.shields.io/badge/IBKR-API-orange)]()
+[![Yahoo Finance](https://img.shields.io/badge/yfinance-Market%20Data-blueviolet)]()
 [![Tests](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Desktop application for advanced risk analysis and Monte Carlo simulation of financial portfolios. It connects directly to Interactive Brokers (IBKR) to fetch real positions, calculates future projections using stochastic models (Geometric Brownian Motion), and provides intelligent, conversational feedback via Google's Gemini AI.
+A professional-grade desktop application for advanced risk analysis and Monte Carlo simulation of financial portfolios. It features a modular broker architecture that allows users to either connect directly to **Interactive Brokers (IBKR)** for real-time account syncing or use a **Manual Mode (Yahoo Finance)** for universal portfolio tracking without requiring a brokerage account.
 
-Built with a clean, modular architecture that strictly separates the UI (PySide6), background threads (QThread), and pure business logic, ensuring a responsive user experience even during complex calculations.
+The platform calculates future projections using stochastic models (Geometric Brownian Motion & Merton Jump-Diffusion) and provides intelligent, conversational feedback via Google's Gemini AI. Built with a clean, decoupled architecture (PySide6, QThread, and pure Python logic), it ensures a high-performance, responsive experience for complex financial modeling.
 
 ## Preview
 
@@ -26,6 +27,7 @@ Built with a clean, modular architecture that strictly separates the UI (PySide6
 *   **Interactive Visualizations:** Dynamic Qcharts embedded in the UI display the simulation cone, with background paths and clearly highlighted percentile lines. The simulation graph supports interactive features including zoom clamping, rubber-band selection, and mouse wheel zoom for detailed analysis of projection paths.
 *   **Merton Jump-Diffusion Stress Testing:** Extends standard GBM simulations by incorporating discrete price jumps (Poisson processes) to model sudden market crashes and extreme tail events, providing a more conservative risk assessment.
 *   **Core-Satellite Portfolio Optimization:** Applies Modern Portfolio Theory (MPT) to calculate the Efficient Frontier and Maximum Sharpe Ratio portfolio. Allows users to "lock" strategic core asset
+*   **Universal Portfolio Support (No Broker Required):** Don't use Interactive Brokers? No problem. The application features a dynamic broker architecture with a built-in `ManualBroker` adapter. It reads your holdings from a simple local JSON file and leverages Yahoo Finance (`yfinance`) to instantly fetch real-time market prices, 5-year historical data, and perform automatic FX conversions, making the app accessible to any investor right out of the box.
 
 ## Project Structure
 
@@ -33,58 +35,64 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 
 ```text
 .
-├── .gitignore                    # gitignore
-├── main.py                       # Application entry point. Initializes QApplication and MainWindow.
-├── main_window.py                # Sets up the main window, the sidebar navigation, and the stacked widget for pages.
+├── .gitignore                       # gitignore
+├── main.py                          # Application entry point. Initializes QApplication and MainWindow.
+├── main_window.py                   # Sets up the main window, the sidebar navigation, and the stacked widget for pages.
 │
-├── pages/                        # UI SCREENS: Each file represents a tab in the application.
-│   ├── dashboard_page.py         # Displays portfolio summary (NLV, Cash, PnL) and open positions. Triggers IBKRWorker.
-│   ├── simulation_page.py        # Monte Carlo controls (years, simulations). Displays results on a graph. Manages SimulationWorker and FastMathWorker.
-│   ├── settings_page.py          # Settings Page
-│   ├── optimization_page.py      # Portfolio optimization interface. Displays Efficient Frontier and actionable trade recommendations.
-│   └── ai_page.py                # Displays the AI-generated report. Triggers AIWorker.
+├── pages/                           # UI SCREENS: Each file represents a tab in the application.
+│   ├── dashboard_page.py            # Displays portfolio summary (NLV, Cash, PnL) and open positions. Triggers IBKRWorker.
+│   ├── simulation_page.py           # Monte Carlo controls (years, simulations). Displays results on a graph. Manages SimulationWorker and FastMathWorker.
+│   ├── settings_page.py             # Settings Page
+│   ├── optimization_page.py         # Portfolio optimization interface. Displays Efficient Frontier and actionable trade recommendations.
+│   └── ai_page.py                   # Displays the AI-generated report. Triggers AIWorker.
 │
-├── workers/                      # BACKGROUND THREADS: Bridge between the UI and the Core logic.
-│   ├── ibkr_thread.py            # IBKRWorker: Fetches live portfolio data without freezing the UI.
-│   ├── simulation_thread.py      # SimulationWorker & FastMathWorker: Handle full simulation setup and fast recalculations.
-│   ├── optimization_thread.py    # OptimizationWorker: Runs Markowitz optimization with core-satellite constraints.
-│   └── ai_thread.py              # AIWorker: Manages communication with the Gemini API.
+├── workers/                         # BACKGROUND THREADS: Bridge between the UI and the Core logic.
+│   ├── data_sync_thread.py          # DataSyncWorker: Fetches live portfolio data via the active broker.
+│   ├── simulation_thread.py         # SimulationWorker & FastMathWorker: Handle full simulation setup.
+│   ├── optimization_thread.py       # OptimizationWorker: Runs Markowitz optimization.
+│   └── ai_thread.py                 # AIWorker: Manages communication with the Gemini API.
 │
-├── core/                         # PURE BUSINESS LOGIC: No Qt dependencies. Can be tested independently.
-│   ├── portfolio.py              # PortfolioManager: The brain of the app. Manages IBKR connection, fetches data, calculates risk metrics (mu, sigma), and integrates all core functions.
-│   ├── gbm_model.py              # GBMSimulator: The mathematical engine. Runs vectorized GBM simulations using NumPy.
-│   ├── merton_model.py           # MJDSimulator: The mathematical engine. Runs vectorized MJD simulations using NumPy.
-│   ├── ai_review.py              # Handles prompting and communication with the Google Gemini API.
-│   ├── graph.py                  # Standalone plotting functions (used for debugging, as the UI uses its own canvas).
-│   ├── path_manager.py           # Centralized path management for assets, configs, and prompts across the application.
-│   ├── markowitz_model.py        # MarkowitzOptimizer: Implements Modern Portfolio Theory for efficient frontier and Sharpe maximization.
-│   └── utils.py                  # Shared utility functions (e.g., reading JSON files).
+├── core/                            # PURE BUSINESS LOGIC: No Qt dependencies. Can be tested independently.
+│   ├── brokers/                     # BROKER ADAPTERS: Multi-broker architecture via Factory Pattern.
+│   │   ├── factory.py               # BrokerFactory: Instantiates the correct broker dynamically.
+│   │   ├── base_broker.py           # BaseBroker: Abstract interface for all broker adapters.
+│   │   ├── ibkr_broker.py           # IBKRBroker: Adapter for Interactive Brokers API.
+│   │   └── manual_broker.py         # ManualBroker: Adapter for Yahoo Finance & local JSON.
+│   ├── portfolio.py                 # PortfolioManager: The brain of the app. Agnostic to the specific broker.
+│   ├── gbm_model.py                 # GBMSimulator: The mathematical engine. Runs vectorized GBM simulations using NumPy.
+│   ├── merton_model.py              # MJDSimulator: The mathematical engine. Runs vectorized MJD simulations using NumPy.
+│   ├── ai_review.py                 # Handles prompting and communication with the Google Gemini API.
+│   ├── graph.py                     # Standalone plotting functions (used for debugging, as the UI uses its own canvas).
+│   ├── path_manager.py              # Centralized path management for assets, configs, and prompts across the application.
+│   ├── markowitz_model.py           # MarkowitzOptimizer: Implements Modern Portfolio Theory for efficient frontier and Sharpe maximization.
+│   └── utils.py                     # Shared utility functions (e.g., reading JSON files).
 │
-├── tests/                        # UNIT TESTS
-│   ├── conftest.py               # Pytest configuration and fixtures
-│   ├── test_gbm.py               # Pytest suite for the GBMSimulator, testing edge cases and statistical properties.
-│   └── test_merton_model.py      # Pytest suite for the MJDSimulator, testing edge cases and statistical properties.
+├── tests/                           # UNIT TESTS
+│   ├── conftest.py                  # Pytest configuration and fixtures
+│   ├── test_gbm.py                  # Pytest suite for the GBMSimulator, testing edge cases and statistical properties.
+│   └── test_merton_model.py         # Pytest suite for the MJDSimulator, testing edge cases and statistical properties.
 │
-├── assets/                       # ASSETS
-│   ├── Icon.ico                  # Application icon (Windows .ico format)
-│   ├── Icon.png                  # Application icon (PNG format for cross-platform use)
-│   ├── SetupIcon.ico             # Setup Icon 
-│   └── style.qss                 # Qt Style Sheet for the application's dark theme.
-
-├── components/                   # Components
-│   ├── chart_widget              # Montecarlo Simulation QChart
-│   └── markowitz_chart.py        # MarkowitzChartView: Custom QChartView for Efficient Frontier rendering.
+├── assets/                          # ASSETS
+│   ├── Icon.ico                     # Application icon (Windows .ico format)
+│   ├── Icon.png                     # Application icon (PNG format for cross-platform use)
+│   ├── SetupIcon.ico                # Setup Icon 
+│   └── style.qss                    # Qt Style Sheet for the application's dark theme.
 │
-├── .github/                      # GITHUB ACTIONS
+├── components/                      # Components
+│   ├── chart_widget                 # Montecarlo Simulation QChart
+│   └── markowitz_chart.py           # MarkowitzChartView: Custom QChartView for Efficient Frontier rendering.
+│
+├── .github/                         # GITHUB ACTIONS
 │   └── workflows/
-│       └── tests.yml             # CI pipeline: Runs tests on Python 3.10, 3.11, 3.12
+│       └── tests.yml                # CI pipeline: Runs tests on Python 3.10, 3.11, 3.12
 │
-├── pytest.ini                    # Pytest configuration (asyncio_mode = auto)
-├── config.json                   # Stores configuration like GEMINI_API_KEY, GEMINI_MODEL, and RISK_FREE_RATE.
-├── prompts.json                  # Contains the system instructions and user prompt templates for the AI.
-├── License                       # MIT License
-├── build.spec                    # Pyinstaller spec file
-└── requirements.txt              # Python package dependencies.
+├── pytest.ini                       # Pytest configuration (asyncio_mode = auto)
+├── config.template.json             # Template for app configuration (API keys, settings). Rename to config.json.
+├── manual_portfolio.template.json   # Template for the Manual Broker (Yahoo Finance). Rename to manual_portfolio.json.
+├── prompts.json                     # Contains the system instructions and user prompt templates for the AI.
+├── LICENSE                          # MIT License
+├── build.spec                       # Pyinstaller spec file
+└── requirements.txt                 # Python package dependencies.
 ```
 
 ## Technology Stack
@@ -92,8 +100,9 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 - Core Language: Python 3.9+
 - GUI Framework: PySide6 (Qt for Python)
 - Data & Math: Pandas, NumPy, SciPy
-- Visualization: Matplotlib
+- Visualization: Qt Charts (PySide6)
 - Broker Integration: IBKR API (ib_async)
+- Market Data (Manual Mode): Yahoo Finance (yfinance)
 - Artificial Intelligence: Google Gemini API (google-generativeai)
 - Testing: Pytest
 
@@ -118,8 +127,8 @@ Follow these steps if you want to run the application directly from the source c
 #### Prerequisites
 
 - Python 3.9 or higher installed on your system.
-- A running instance of IBKR Trader Workstation (TWS) or IB Gateway, configured to allow API connections
 - A Google AI Studio API key for the Gemini features.
+- (Optional) A running instance of IBKR Trader Workstation (TWS) or IB Gateway. If you don't use IBKR, the application defaults to the built-in Manual Broker (Yahoo Finance).
 - (Optional) Inno Setup installed, if you intend to build the Windows installer.
 
 #### 1. Running from Source
@@ -150,9 +159,11 @@ Follow these steps if you want to run the application directly from the source c
    
 4. **Configure the application:**
    
-   - Gemini API Key: Enter your Google AI Studio API key (required for AI Insights feature)
-   - IBKR Connection: Verify host (default: 127.0.0.1), port (default: 4002), and client ID (default: 1)
-   - Simulation Defaults: Adjust risk-free rate and other parameters as needed
+   - Copy the `config.template.json` file and rename it to `config.json`.
+   - Open `config.json` (or use the Settings page in the app) to configure:
+     - **Gemini API Key:** Enter your Google AI Studio API key (required for AI Insights).
+     - **IBKR Connection:** Verify host, port, and client ID (only if using Interactive Brokers).
+     - **Simulation Defaults:** Adjust risk-free rate and other parameters.
      
 5. **Run the application:**
    
@@ -210,7 +221,16 @@ The application can be packaged into a single executable file using PyInstaller,
 
 ### How to use
 
-* **Dashboard:** Upon starting, the app automatically connects to IBKR and fetches your portfolio data. Click the "Refresh IBKR Data" button to manually update.
+#### Choosing your Broker
+By default, the application is set to use the **Manual Broker (Yahoo Finance)**, which requires no API keys and is ready out-of-the-box:
+1. Copy the provided `manual_portfolio.template.json` in the root directory and rename it to `manual_portfolio.json`.
+2. Edit this file to define your base currency, cash balance, and positions using standard Yahoo Finance tickers (e.g., `"AAPL"`, `"VWCE.DE"`, `"BTC-USD"`).
+3. The app will automatically fetch real-time prices, historical data, and handle FX conversions.
+
+*(Note: To connect your real Interactive Brokers account, go to the **Settings** tab, select "Interactive Brokers" as the Active Broker, and ensure TWS/Gateway is running).*
+
+#### Interface Navigation
+* **Dashboard:** Upon starting, the app automatically connects to the active broker and fetches your portfolio data. Click the "Refresh Data" button to manually update.
 * **Simulation:** Navigate to the "Simulation" tab. The first time you visit, it will automatically start a background preload (fetching historical data and calculating base risk metrics). Once preloaded, you can adjust the years and number of simulations and click "Run Simulation" for instant results.
 * **Optimization:** After loading portfolio data, navigate to the "Optimization" tab. Select which assets you want to "lock" (core holdings) by checking the boxes in the table. Click "Run Optimization" to calculate the constrained Efficient Frontier and the optimal Max Sharpe portfolio. The page will display the improvement in Sharpe ratio and a detailed action table with Buy/Sell/Hold recommendations for each asset.
 * **AI Insights:** After running a simulation, go to the "AI Insights" tab. The AI analysis will trigger automatically, providing a detailed report on your portfolio's risk and potential.
