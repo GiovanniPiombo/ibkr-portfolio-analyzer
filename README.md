@@ -135,7 +135,7 @@ Follow these steps if you want to run the application directly from the source c
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git)
+   git clone https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer.git
    cd ibkr-portfolio-analyzer
    ```
    
