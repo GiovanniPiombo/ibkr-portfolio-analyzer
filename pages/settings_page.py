@@ -46,7 +46,7 @@ class SettingsPage(QWidget):
 
         # ─── SETUP SCROLL AREA ─────────────────────────────────────────
         scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True) # CRITICAL: Allows internal widget to expand
+        scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         scroll_content = QWidget()
@@ -117,10 +117,14 @@ class SettingsPage(QWidget):
         form_layout.addRow(QLabel("Jump Threshold:"), self.jump_threshold_input)
 
         # ─── Broker Settings ───────────────────────────────────────────
-        broker_section = QLabel("IBKR CONNECTION SETTINGS")
+        broker_section = QLabel("BROKER SETTINGS")
         broker_section.setObjectName("section_label")
         broker_section.setStyleSheet("margin-top: 10px;") 
         form_layout.addRow(broker_section)
+
+        self.active_broker_input = QComboBox()
+        self.active_broker_input.addItems(["Interactive Brokers", "Manual (Yahoo Finance)"])
+        self.active_broker_input.currentTextChanged.connect(self.toggle_broker_fields)
 
         self.ibkr_host_input = QLineEdit()
         self.ibkr_port_input = QSpinBox()
@@ -134,10 +138,11 @@ class SettingsPage(QWidget):
         self.ibkr_timeout_input.setSuffix(" sec")
         self.ibkr_timeout_input.setToolTip("Max time to wait for PnL data to settle from the broker.")
 
-        form_layout.addRow(QLabel("Host (IP):"), self.ibkr_host_input)
-        form_layout.addRow(QLabel("Port:"), self.ibkr_port_input)
-        form_layout.addRow(QLabel("Client ID:"), self.ibkr_client_id_input)
-        form_layout.addRow(QLabel("Data Timeout:"), self.ibkr_timeout_input)
+        form_layout.addRow(QLabel("Active Broker:"), self.active_broker_input)
+        form_layout.addRow(QLabel("IBKR Host (IP):"), self.ibkr_host_input)
+        form_layout.addRow(QLabel("IBKR Port:"), self.ibkr_port_input)
+        form_layout.addRow(QLabel("IBKR Client ID:"), self.ibkr_client_id_input)
+        form_layout.addRow(QLabel("IBKR Data Timeout:"), self.ibkr_timeout_input)
 
         scroll_area.setWidget(scroll_content)
         main_layout.addWidget(scroll_area)
@@ -175,6 +180,7 @@ class SettingsPage(QWidget):
 
             self.jump_threshold_input.setValue(config.get("JUMP_THRESHOLD", 3.0))
 
+            self.active_broker_input.setCurrentText(config.get("ACTIVE_BROKER", "Manual (Yahoo Finance)"))
             self.ibkr_host_input.setText(config.get("IBKR_HOST", "127.0.0.1"))
             self.ibkr_port_input.setValue(config.get("IBKR_PORT", 4001))
             self.ibkr_client_id_input.setValue(config.get("IBKR_CLIENT_ID", 1))
@@ -206,6 +212,7 @@ class SettingsPage(QWidget):
         config["DEFAULT_SIMS"] = int(self.mc_sims_input.currentText())
         config["JUMP_THRESHOLD"] = round(self.jump_threshold_input.value(), 2)
 
+        config["ACTIVE_BROKER"] = self.active_broker_input.currentText()
         config["IBKR_HOST"] = self.ibkr_host_input.text().strip()
         config["IBKR_PORT"] = self.ibkr_port_input.value()
         config["IBKR_CLIENT_ID"] = self.ibkr_client_id_input.value()
@@ -222,3 +229,11 @@ class SettingsPage(QWidget):
         else:
             app_logger.error("Could not save the config.json file from UI.")
             QMessageBox.critical(self, "Error", "Could not save the config.json file.")
+
+    def toggle_broker_fields(self, text: str):
+        """Disables IBKR specific inputs if the manual broker is selected."""
+        is_ibkr = (text == "Interactive Brokers")
+        self.ibkr_host_input.setEnabled(is_ibkr)
+        self.ibkr_port_input.setEnabled(is_ibkr)
+        self.ibkr_client_id_input.setEnabled(is_ibkr)
+        self.ibkr_timeout_input.setEnabled(is_ibkr)

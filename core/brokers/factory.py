@@ -1,6 +1,8 @@
 from core.brokers.ibkr_broker import IBKRBroker
+from core.brokers.manual_broker import ManualBroker
 from core.utils import read_json
 from core.path_manager import PathManager
+from core.logger import app_logger
 
 class BrokerFactory:
     """
@@ -14,11 +16,16 @@ class BrokerFactory:
         Reads the configuration and returns an initialized instance of a BaseBroker.
         In the future, this will check an "ACTIVE_BROKER" setting in config.json 
         to decide the broker to return.
+        Defaults to ManualBroker (Yahoo Finance) if no setting is found.
         """
+        active_broker = read_json(PathManager.CONFIG_FILE, "ACTIVE_BROKER") or "Manual (Yahoo Finance)"
         
-        # IBKR
-        host = read_json(PathManager.CONFIG_FILE, "IBKR_HOST") or '127.0.0.1'
-        port = read_json(PathManager.CONFIG_FILE, "IBKR_PORT") or 4001
-        client_id = read_json(PathManager.CONFIG_FILE, "IBKR_CLIENT_ID") or 1
+        if active_broker == "Interactive Brokers":
+            app_logger.info("BrokerFactory: Initializing IBKRBroker.")
+            host = read_json(PathManager.CONFIG_FILE, "IBKR_HOST") or '127.0.0.1'
+            port = read_json(PathManager.CONFIG_FILE, "IBKR_PORT") or 4001
+            client_id = read_json(PathManager.CONFIG_FILE, "IBKR_CLIENT_ID") or 1
+            return IBKRBroker(host=host, port=port, client_id=client_id)
         
-        return IBKRBroker(host=host, port=port, client_id=client_id)
+        app_logger.info("BrokerFactory: Initializing ManualBroker (Yahoo Finance) as default.")
+        return ManualBroker()
