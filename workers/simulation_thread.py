@@ -1,16 +1,18 @@
 import asyncio
 from PySide6.QtCore import QThread, Signal
-from core.portfolio import PortfolioManager
 import numpy as np
+
+from core.portfolio import PortfolioManager
+from core.brokers.ibkr_broker import IBKRBroker
 from core.gbm_model import GBMSimulator
 from core.merton_model import MJDSimulator
-from core.utils import read_json
 from core.path_manager import PathManager
 from core.logger import app_logger
+from core.brokers.factory import BrokerFactory
 
 class SimulationWorker(QThread):
     """
-    A background worker thread for fetching portfolio data from IBKR 
+    A background worker thread for fetching portfolio data from the broker
     and executing full Monte Carlo simulations.
 
     This thread handles API connections, data fetching, risk metric calculations, 
@@ -58,23 +60,20 @@ class SimulationWorker(QThread):
         and executes the simulation pipelines.
 
         Steps performed:
-        1. Connects to IBKR TWS/Gateway using credentials from the configuration file.
+        1. Connects to the Broker.
         2. Fetches current summary, positions, and historical price data.
         3. Calculates risk metrics separating cash and risky assets.
         4. Runs both standard (GBM) and stress-test (Merton) simulations.
         5. Calculates the 5th, 50th, and 95th percentiles for the generated paths.
         6. Emits the formatted payload to the main UI.
         """
-        host = read_json(PathManager.CONFIG_FILE, "IBKR_HOST") or '127.0.0.1'
-        port = read_json(PathManager.CONFIG_FILE, "IBKR_PORT") or 4001
-        client_id = read_json(PathManager.CONFIG_FILE, "IBKR_CLIENT_ID") or 1
-
-        pm = PortfolioManager(host=host, port=port, client_id=client_id)
+        broker = BrokerFactory.get_active_broker()
+        pm = PortfolioManager(broker=broker)
         
-        self.progress_update.emit(f"Connecting to IBKR ({host}:{port})...")
+        self.progress_update.emit("Connecting to Broker ...")
         connected = await pm.connect()
         if not connected:
-            self.error_occurred.emit("Failed to connect to IBKR. Is TWS/Gateway running?")
+            self.error_occurred.emit("Failed to connect to Broker. Is the gateway running?")
             return
 
         try:

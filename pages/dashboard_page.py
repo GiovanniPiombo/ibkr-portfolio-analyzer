@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QMessageBox
 from PySide6.QtCore import Qt, Signal, QTimer
-from workers.ibkr_thread import IBKRWorker
+from workers.data_sync_thread import DataSyncWorker
 from core.logger import app_logger
 
 class DashboardPage(QWidget):
@@ -9,7 +9,7 @@ class DashboardPage(QWidget):
 
     This page serves as the entry point for financial data. It displays 
     high-level metrics (Net Liquidation Value, Cash, Daily P&L) and a detailed 
-    table of open positions. It utilizes an `IBKRWorker` to fetch data 
+    table of open positions. It utilizes an `DataSyncWorker` to fetch data 
     asynchronously, ensuring the UI remains responsive during network calls.
 
     Signals:
@@ -20,7 +20,7 @@ class DashboardPage(QWidget):
     Attributes:
         cached_data (dict): Stores the most recently fetched portfolio data 
             (currency, weights, positions) for use by other application components.
-        worker (IBKRWorker): The background thread responsible for API calls.
+        worker (DataSyncWorker): The background thread responsible for API calls.
     """
     dashboard_refreshed = Signal()
 
@@ -164,15 +164,15 @@ class DashboardPage(QWidget):
         Initiates the asynchronous data fetching process.
 
         Disables the refresh button to prevent overlapping requests, updates 
-        the button text to show progress, instantiates a new `IBKRWorker`, 
+        the button text to show progress, instantiates a new `DataSyncWorker`, 
         connects its signals, and starts the thread.
         """
         app_logger.debug("Button clicked! Starting function...")
         self.refresh_btn.setEnabled(False)
         self.refresh_btn.setText("Connecting...")
 
-        app_logger.debug("Creating IBKRWorker thread...")
-        self.worker = IBKRWorker()
+        app_logger.debug("Creating DataSyncWorker thread...")
+        self.worker = DataSyncWorker()
         self.worker.progress_update.connect(lambda msg: self.refresh_btn.setText(msg))
         self.worker.data_fetched.connect(self.on_data_fetched)
         self.worker.error_occurred.connect(self.on_error)
@@ -182,7 +182,7 @@ class DashboardPage(QWidget):
 
     def on_data_fetched(self, data):
         """
-        Callback triggered when the IBKRWorker successfully returns data.
+        Callback triggered when the DataSyncWorker successfully returns data.
 
         Parses the incoming dictionary to update the summary cards (applying 
         positive/negative styling to P&L) and populates the positions table. 
@@ -225,7 +225,7 @@ class DashboardPage(QWidget):
 
     def on_error(self, error_msg):
         """
-        Callback triggered if the IBKRWorker encounters an exception.
+        Callback triggered if the DataSyncWorker encounters an exception.
 
         Restores the UI state (re-enabling the refresh button) and presents 
         a critical error dialog to the user with the failure details.
@@ -233,10 +233,10 @@ class DashboardPage(QWidget):
         Args:
             error_msg (str): The formatted error string from the worker thread.
         """
-        app_logger.error(f"IBKR Error UI Popup: {error_msg}")
+        app_logger.error(f"Error UI Popup: {error_msg}")
         self.refresh_btn.setEnabled(True)
-        self.refresh_btn.setText("Refresh IBKR Data")
-        QMessageBox.critical(self, "IBKR Error", f"An error occurred:\n{error_msg}")
+        self.refresh_btn.setText("Refresh Data")
+        QMessageBox.critical(self, "Error", f"An error occurred:\n{error_msg}")
     
     def set_refresh_enabled(self, is_enabled: bool, message: str = None):
         """
@@ -245,6 +245,6 @@ class DashboardPage(QWidget):
         """
         self.refresh_btn.setEnabled(is_enabled)
         if is_enabled:
-            self.refresh_btn.setText("Refresh IBKR Data")
+            self.refresh_btn.setText("Refresh Data")
         else:
             self.refresh_btn.setText(message if message else "Processing...")
