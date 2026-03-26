@@ -14,5 +14,10 @@
     "LOOKBACK_PERIOD": 10,
     "LOOK": 5,
     "DISPLAY_CURRENCY": "EUR",
-    "ACTIVE_BROKER": "Manual (Yahoo Finance)"
+    "ACTIVE_BROKER": "Crypto Exchange",
+    "CRYPTO_EXCHANGE": "binance",
+    "CRYPTO_API_KEY": "YOUR CRYPTO KEY",
+    "CRYPTO_SECRET": "YOUR SECRET",
+    "USE_TESTNET": true,
+    "CRYPTO_DUST_THRESHOLD": 0.0001
 }

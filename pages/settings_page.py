@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QDoubleSpinBox, QSpinBox, QPushButton, QFormLayout, QMessageBox, QComboBox, QScrollArea
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QDoubleSpinBox, QSpinBox, QPushButton, QFormLayout, QMessageBox, QComboBox, QScrollArea, QCheckBox
 from PySide6.QtCore import Qt
 from core.utils import read_json, write_json
 from core.path_manager import PathManager
@@ -9,12 +9,12 @@ class SettingsPage(QWidget):
     User interface component for configuring global application settings.
 
     This page manages user preferences including Gemini API credentials, 
-    Monte Carlo simulation defaults, and Interactive Brokers (IBKR) connection 
-    parameters. It handles loading existing configurations from `config.json`, 
+    Monte Carlo simulation defaults, and Broker connection parameters. 
+    It handles loading existing configurations from `config.json`, 
     displaying them in categorized form fields, and saving user modifications 
     back to the local file system.
     """
-
+    
     def __init__(self):
         """
         Initializes the SettingsPage.
@@ -84,7 +84,7 @@ class SettingsPage(QWidget):
         self.lookback_period.setSuffix(" Years")
 
         self.currency_input = QComboBox()
-        self.currency_input.addItems(["AUTO (Broker Default)", "USD", "EUR", "GBP", "CHF"])
+        self.currency_input.addItems(["AUTO (Broker Default)", "USD", "EUR", "GBP", "CHF", "USDT"])
 
         form_layout.addRow(QLabel("Gemini API Key:"), self.api_key_input)
         form_layout.addRow(QLabel("AI Model:"), self.model_input)
@@ -110,7 +110,7 @@ class SettingsPage(QWidget):
         self.jump_threshold_input.setRange(1.0, 10.0)
         self.jump_threshold_input.setSingleStep(0.5)
         self.jump_threshold_input.setSuffix(" \u03c3 (Sigma)")
-        self.jump_threshold_input.setToolTip("Sets the standard deviation multiplier to identify historical market crashes (Merton Jumps). Lower = more sensitive.")
+        self.jump_threshold_input.setToolTip("Sets the standard deviation multiplier to identify historical market crashes. Lower = more sensitive.")
 
         form_layout.addRow(QLabel("Default Years:"), self.mc_years_input)
         form_layout.addRow(QLabel("Default Simulations:"), self.mc_sims_input)
@@ -123,7 +123,7 @@ class SettingsPage(QWidget):
         form_layout.addRow(broker_section)
 
         self.active_broker_input = QComboBox()
-        self.active_broker_input.addItems(["Interactive Brokers", "Manual (Yahoo Finance)"])
+        self.active_broker_input.addItems(["Interactive Brokers", "Crypto Exchange", "Manual (Yahoo Finance)"])
         self.active_broker_input.currentTextChanged.connect(self.toggle_broker_fields)
 
         self.ibkr_host_input = QLineEdit()
@@ -131,18 +131,34 @@ class SettingsPage(QWidget):
         self.ibkr_port_input.setRange(1000, 9999)
         self.ibkr_client_id_input = QSpinBox()
         self.ibkr_client_id_input.setRange(1, 999)
-        
         self.ibkr_timeout_input = QDoubleSpinBox()
         self.ibkr_timeout_input.setRange(1.0, 30.0)
         self.ibkr_timeout_input.setSingleStep(0.5)
         self.ibkr_timeout_input.setSuffix(" sec")
-        self.ibkr_timeout_input.setToolTip("Max time to wait for PnL data to settle from the broker.")
 
-        form_layout.addRow(QLabel("Active Broker:"), self.active_broker_input)
         form_layout.addRow(QLabel("IBKR Host (IP):"), self.ibkr_host_input)
         form_layout.addRow(QLabel("IBKR Port:"), self.ibkr_port_input)
         form_layout.addRow(QLabel("IBKR Client ID:"), self.ibkr_client_id_input)
         form_layout.addRow(QLabel("IBKR Data Timeout:"), self.ibkr_timeout_input)
+
+        self.crypto_exchange_input = QLineEdit()
+        self.crypto_api_input = QLineEdit()
+        self.crypto_api_input.setEchoMode(QLineEdit.Password)
+        self.crypto_secret_input = QLineEdit()
+        self.crypto_secret_input.setEchoMode(QLineEdit.Password)
+        self.crypto_testnet_input = QCheckBox("Enable Sandbox/Testnet")
+        self.crypto_dust_input = QDoubleSpinBox()
+        self.crypto_dust_input.setDecimals(4)
+        self.crypto_dust_input.setRange(0.0, 10.0)
+        self.crypto_dust_input.setSingleStep(0.0001)
+
+        form_layout.addRow(QLabel("CCXT Exchange ID:"), self.crypto_exchange_input)
+        form_layout.addRow(QLabel("Crypto API Key:"), self.crypto_api_input)
+        form_layout.addRow(QLabel("Crypto Secret:"), self.crypto_secret_input)
+        form_layout.addRow(QLabel("Crypto Testnet:"), self.crypto_testnet_input)
+        form_layout.addRow(QLabel("Dust Threshold:"), self.crypto_dust_input)
+
+        form_layout.insertRow(23, QLabel("Active Broker:"), self.active_broker_input) 
 
         scroll_area.setWidget(scroll_content)
         main_layout.addWidget(scroll_area)
@@ -174,18 +190,26 @@ class SettingsPage(QWidget):
             self.risk_free_input.setValue(config.get("RISK_FREE_RATE", 0.0) * 100)
             self.pacing_limit.setValue(config.get("PACING_LIMIT", 5))
             self.lookback_period.setValue(config.get("LOOKBACK_PERIOD", 5))
+            self.currency_input.setCurrentText(config.get("DISPLAY_CURRENCY", "AUTO (Broker Default)"))
             
             self.mc_years_input.setValue(config.get("DEFAULT_YEARS", 5))
             self.mc_sims_input.setCurrentText(str(config.get("DEFAULT_SIMS", 10000)))
-
             self.jump_threshold_input.setValue(config.get("JUMP_THRESHOLD", 3.0))
 
             self.active_broker_input.setCurrentText(config.get("ACTIVE_BROKER", "Manual (Yahoo Finance)"))
+
             self.ibkr_host_input.setText(config.get("IBKR_HOST", "127.0.0.1"))
             self.ibkr_port_input.setValue(config.get("IBKR_PORT", 4001))
             self.ibkr_client_id_input.setValue(config.get("IBKR_CLIENT_ID", 1))
             self.ibkr_timeout_input.setValue(config.get("IBKR_TIMEOUT", 5.0))
-            self.currency_input.setCurrentText(config.get("DISPLAY_CURRENCY", "AUTO (Broker Default)"))
+            
+            self.crypto_exchange_input.setText(config.get("CRYPTO_EXCHANGE", "alpaca"))
+            self.crypto_api_input.setText(config.get("CRYPTO_API_KEY", ""))
+            self.crypto_secret_input.setText(config.get("CRYPTO_SECRET", ""))
+            self.crypto_testnet_input.setChecked(config.get("USE_TESTNET", True))
+            self.crypto_dust_input.setValue(config.get("CRYPTO_DUST_THRESHOLD", 0.0001))
+
+            self.toggle_broker_fields(self.active_broker_input.currentText())
 
     def save_settings(self):
         """
@@ -206,34 +230,42 @@ class SettingsPage(QWidget):
         config["RISK_FREE_RATE"] = round(self.risk_free_input.value() / 100.0, 4)
         config["PACING_LIMIT"] = self.pacing_limit.value()
         config["LOOKBACK_PERIOD"] = self.lookback_period.value()
-        
         config["LOOK"] = self.mc_years_input.value()
         config["DEFAULT_YEARS"] = self.mc_years_input.value()
         config["DEFAULT_SIMS"] = int(self.mc_sims_input.currentText())
         config["JUMP_THRESHOLD"] = round(self.jump_threshold_input.value(), 2)
+        config["DISPLAY_CURRENCY"] = self.currency_input.currentText()
 
         config["ACTIVE_BROKER"] = self.active_broker_input.currentText()
         config["IBKR_HOST"] = self.ibkr_host_input.text().strip()
         config["IBKR_PORT"] = self.ibkr_port_input.value()
         config["IBKR_CLIENT_ID"] = self.ibkr_client_id_input.value()
         config["IBKR_TIMEOUT"] = self.ibkr_timeout_input.value()
-        config["DISPLAY_CURRENCY"] = self.currency_input.currentText()
+        
+        config["CRYPTO_EXCHANGE"] = self.crypto_exchange_input.text().strip()
+        config["CRYPTO_API_KEY"] = self.crypto_api_input.text().strip()
+        config["CRYPTO_SECRET"] = self.crypto_secret_input.text().strip()
+        config["USE_TESTNET"] = self.crypto_testnet_input.isChecked()
+        config["CRYPTO_DUST_THRESHOLD"] = self.crypto_dust_input.value()
 
         if write_json(PathManager.CONFIG_FILE, config):
             app_logger.info("User settings saved successfully.")
-            QMessageBox.information(
-                self, 
-                "Restart Recommended", 
-                "Settings saved successfully!\n\nPlease restart the application for all changes to take full effect."
-            )
+            QMessageBox.information(self, "Restart Recommended", "Settings saved successfully!\n\nPlease restart the application.")
         else:
             app_logger.error("Could not save the config.json file from UI.")
             QMessageBox.critical(self, "Error", "Could not save the config.json file.")
 
     def toggle_broker_fields(self, text: str):
-        """Disables IBKR specific inputs if the manual broker is selected."""
+        """Disables specific broker inputs if they are not the currently selected active broker."""
         is_ibkr = (text == "Interactive Brokers")
         self.ibkr_host_input.setEnabled(is_ibkr)
         self.ibkr_port_input.setEnabled(is_ibkr)
         self.ibkr_client_id_input.setEnabled(is_ibkr)
         self.ibkr_timeout_input.setEnabled(is_ibkr)
+
+        is_crypto = (text == "Crypto Exchange")
+        self.crypto_exchange_input.setEnabled(is_crypto)
+        self.crypto_api_input.setEnabled(is_crypto)
+        self.crypto_secret_input.setEnabled(is_crypto)
+        self.crypto_testnet_input.setEnabled(is_crypto)
+        self.crypto_dust_input.setEnabled(is_crypto)

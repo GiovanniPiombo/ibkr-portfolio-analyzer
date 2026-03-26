@@ -1,5 +1,6 @@
 from core.brokers.ibkr_broker import IBKRBroker
 from core.brokers.manual_broker import ManualBroker
+from core.brokers.crypto_broker import CryptoBroker
 from core.utils import read_json
 from core.path_manager import PathManager
 from core.logger import app_logger
@@ -26,6 +27,10 @@ class BrokerFactory:
             port = read_json(PathManager.CONFIG_FILE, "IBKR_PORT") or 4001
             client_id = read_json(PathManager.CONFIG_FILE, "IBKR_CLIENT_ID") or 1
             return IBKRBroker(host=host, port=port, client_id=client_id)
+        
+        elif active_broker == "Crypto Exchange":
+            app_logger.info("BrokerFactory: Initializing CryptoBroker (CCXT).")
+            return CryptoBroker()
         
         app_logger.info("BrokerFactory: Initializing ManualBroker (Yahoo Finance) as default.")
         return ManualBroker()
