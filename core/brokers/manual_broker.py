@@ -92,10 +92,12 @@ class ManualBroker(BaseBroker):
         self.risky_assets = [p["ticker"] for p in raw_positions]
         positions_for_ui = []
         total_risky_value = 0.0
+        total_daily_pnl = 0.0 
         
         if self.risky_assets:
             app_logger.info(f"ManualBroker: Fetching current prices from yfinance for {self.risky_assets}")
-            yf_data = yf.download(self.risky_assets, period="1d", progress=False)
+            
+            yf_data = yf.download(self.risky_assets, period="5d", progress=False)
             
             for pos in raw_positions:
                 sym = pos["ticker"]
@@ -103,11 +105,15 @@ class ManualBroker(BaseBroker):
                 
                 if len(self.risky_assets) == 1:
                     current_price = float(yf_data['Close'].iloc[-1])
+                    prev_close = float(yf_data['Close'].iloc[-2])
                 else:
                     current_price = float(yf_data['Close'][sym].iloc[-1])
+                    prev_close = float(yf_data['Close'][sym].iloc[-2])
                 
-                asset_info = yf.Ticker(sym).fast_info
-                native_currency = getattr(asset_info, 'currency', self.base_currency)
+                try:
+                    native_currency = yf.Ticker(sym).fast_info['currency']
+                except (KeyError, AttributeError):
+                    native_currency = self.base_currency
                 
                 fx_rate = await self.get_fx_rate(native_currency, self.base_currency)
                 
@@ -115,6 +121,11 @@ class ManualBroker(BaseBroker):
                 market_value = current_price_base * qty
                 total_risky_value += market_value
                 
+                daily_pnl_native = (current_price - prev_close) * qty
+                daily_pnl_base = daily_pnl_native * fx_rate
+                
+                total_daily_pnl += daily_pnl_base
+
                 positions_for_ui.append([sym, qty, current_price_base, market_value])
 
         self.total_value = self.cash_value_base + total_risky_value
@@ -133,7 +144,7 @@ class ManualBroker(BaseBroker):
             "nlv": self.total_value,
             "cash": self.cash_value_base,
             "currency": self.base_currency,
-            "pnl": 0.0, 
+            "pnl": total_daily_pnl, 
             "positions": positions_for_ui,
             "risky_weight": self.sum_risky_weights * 100,
             "cash_weight": cash_weight * 100,
