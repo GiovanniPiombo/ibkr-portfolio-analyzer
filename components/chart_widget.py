@@ -1,7 +1,6 @@
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QTimer
 from PySide6.QtGui import QColor, QPen, QPainter, QCursor
 from PySide6.QtCharts import QChart, QChartView, QLineSeries, QValueAxis
-from PySide6.QtCore import Qt, QPointF, QTimer
 from PySide6.QtWidgets import QToolTip
 from core.logger import app_logger
 from core.utils import read_json
@@ -39,8 +38,9 @@ class MonteCarloChartView(QChartView):
         
         self.chart.setBackgroundBrush(QColor('#0D1117'))
         self.chart.setTitleBrush(QColor('#E8EDF5'))
-        self.chart.legend().setLabelColor(QColor('#C8D0DC'))
-        self.chart.legend().setAlignment(Qt.AlignBottom)
+        
+        self.chart.legend().hide()
+        
         self.chart.layout().setContentsMargins(0, 0, 0, 0)
         self.chart.setBackgroundRoundness(0)
 
@@ -53,6 +53,7 @@ class MonteCarloChartView(QChartView):
         self.orig_x_max = 0.0
         self.orig_y_min = 0.0
         self.orig_y_max = 0.0
+        self.scale_factor = 1.0
 
     def update_graph(self, time_steps, worst, median, best, background_lines):
         """
@@ -82,11 +83,21 @@ class MonteCarloChartView(QChartView):
         self.orig_x_min = 0.0
         self.orig_x_max = float(time_steps[-1])
         
-        min_val = float(background_lines.min()) * 0.95
-        max_val = float(background_lines.max()) * 1.05
+        min_val = float(worst.min()) * 0.95 if len(worst) > 0 else 0.0
+        max_val = float(best.max()) * 1.20
         
         self.orig_y_min = 0.0 if min_val < 0 else min_val 
         self.orig_y_max = max_val
+
+        self.scale_factor = 1.0
+        axis_title_suffix = ""
+        
+        if self.orig_y_max >= 1_000_000:
+            self.scale_factor = 1_000_000.0
+            axis_title_suffix = " (in Millions)"
+        elif self.orig_y_max >= 10_000:
+            self.scale_factor = 1_000.0
+            axis_title_suffix = " (in Thousands)"
 
         num_bg_lines = min(100, background_lines.shape[0] if len(background_lines.shape) > 1 else 0)
         
@@ -96,13 +107,13 @@ class MonteCarloChartView(QChartView):
         for i in range(num_bg_lines):
             series = QLineSeries()
             series.setPen(bg_pen)
-            points = [QPointF(float(x), float(y)) for x, y in zip(time_steps, background_lines[i])]
+            points = [QPointF(float(x), float(y) / self.scale_factor) for x, y in zip(time_steps, background_lines[i])]
             series.append(points)
             self.chart.addSeries(series)
 
-        self._add_main_series(time_steps, worst, "Worst (5%)", "#E05252")
-        self._add_main_series(time_steps, median, "Median (50%)", "#4A90E2")
-        self._add_main_series(time_steps, best, "Best (95%)", "#2ECC8A")
+        self._add_main_series(time_steps, worst, "Worst (5%)", "#E05252", self.scale_factor)
+        self._add_main_series(time_steps, median, "Median (50%)", "#4A90E2", self.scale_factor)
+        self._add_main_series(time_steps, best, "Best (95%)", "#2ECC8A", self.scale_factor)
 
         self.axis_x = QValueAxis()
         self.axis_x.setTitleText("Trading Days")
@@ -113,9 +124,10 @@ class MonteCarloChartView(QChartView):
         self.axis_x.setGridLineColor(QColor(200, 208, 220, 25))
 
         self.axis_y = QValueAxis()
-        self.axis_y.setTitleText(f"Portfolio Value ({self.current_currency})") 
-        self.axis_y.setLabelFormat("%.0f")
-        self.axis_y.setRange(self.orig_y_min, self.orig_y_max)
+        self.axis_y.setTitleText(f"Portfolio Value ({self.current_currency}){axis_title_suffix}") 
+        self.axis_y.setLabelFormat("%.1f")
+
+        self.axis_y.setRange(self.orig_y_min / self.scale_factor, self.orig_y_max / self.scale_factor)
         self.axis_y.setLabelsColor(QColor('#C8D0DC'))
         self.axis_y.setTitleBrush(QColor('#C8D0DC'))
         self.axis_y.setGridLineColor(QColor(200, 208, 220, 25))
@@ -130,7 +142,7 @@ class MonteCarloChartView(QChartView):
         simulated_years = int(self.orig_x_max // 252)
         self.chart.setTitle(f"Portfolio Value Projection ({simulated_years} Years)")
 
-    def _add_main_series(self, x_data, y_data, name, hex_color):
+    def _add_main_series(self, x_data, y_data, name, hex_color, scale_factor):
         """
         Helper method to create and style a main percentile line series.
 
@@ -147,7 +159,7 @@ class MonteCarloChartView(QChartView):
         pen.setWidth(2)
         series.setPen(pen)
         
-        points = [QPointF(float(x), float(y)) for x, y in zip(x_data, y_data)]
+        points = [QPointF(float(x), float(y) / scale_factor) for x, y in zip(x_data, y_data)]
         series.append(points)
         self.chart.addSeries(series)
 
@@ -170,10 +182,14 @@ class MonteCarloChartView(QChartView):
             self.axis_x.setMax(self.orig_x_max)
 
         # Force Y-Axis Limits
-        if self.axis_y.min() < self.orig_y_min:
-            self.axis_y.setMin(self.orig_y_min)
-        if self.axis_y.max() > self.orig_y_max:
-            self.axis_y.setMax(self.orig_y_max)
+
+        scaled_y_min = self.orig_y_min / self.scale_factor
+        scaled_y_max = self.orig_y_max / self.scale_factor
+
+        if self.axis_y.min() < scaled_y_min:
+            self.axis_y.setMin(scaled_y_min)
+        if self.axis_y.max() > scaled_y_max:
+            self.axis_y.setMax(scaled_y_max)
 
     def wheelEvent(self, event):
         """
@@ -246,7 +262,7 @@ class MonteCarloChartView(QChartView):
         """
         if self.axis_x and self.axis_y:
             self.axis_x.setRange(self.orig_x_min, self.orig_x_max)
-            self.axis_y.setRange(self.orig_y_min, self.orig_y_max)
+            self.axis_y.setRange(self.orig_y_min / self.scale_factor, self.orig_y_max / self.scale_factor)
 
     def _handle_series_hover(self, point: QPointF, state: bool, series_name: str):
         """
@@ -260,11 +276,11 @@ class MonteCarloChartView(QChartView):
         """
         if state:
             day = int(point.x())
-            value = point.y()
+            real_value = point.y() * getattr(self, 'scale_factor', 1.0)
             
             cur = getattr(self, 'current_currency', '€')
             
-            tooltip_text = f"<b>{series_name}</b><br>Day: {day}<br>Value: {value:,.0f} {cur}"
+            tooltip_text = f"<b>{series_name}</b><br>Day: {day}<br>Value: {real_value:,.0f} {cur}"
             
             QToolTip.showText(QCursor.pos(), tooltip_text, self)
         else:
