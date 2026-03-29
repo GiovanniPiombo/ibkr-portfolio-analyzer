@@ -138,10 +138,20 @@ class MainWindow(QMainWindow):
 
         if index == 1:
             self.simulation_page.set_dashboard_data(self.shared_portfolio_data)
+        elif index == 2:
+            self.optimization_page.set_data(
+                self.shared_portfolio_data.get("metrics", {}),
+                self.shared_portfolio_data.get("positions", [])
+            )
 
     def on_dashboard_ready(self):
         """Called when IBKR data is successfully loaded in the dashboard."""
         app_logger.info("MainWindow: Dashboard data received. Merging into shared cache.")
+        self.shared_portfolio_data.update(self.dashboard_page.cached_data)
+
+        if "metrics" in self.shared_portfolio_data:
+            del self.shared_portfolio_data["metrics"]
+
         self.simulation_page.set_dashboard_data(self.shared_portfolio_data)
         self.shared_portfolio_data.update(self.dashboard_page.cached_data)
         self.simulation_page.start_background_preload()

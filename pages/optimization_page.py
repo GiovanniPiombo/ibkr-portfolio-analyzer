@@ -137,11 +137,11 @@ class OptimizationPage(QWidget):
             metrics (dict): Risk metrics including symbols and covariance.
             positions (list): Raw position data from IBKR.
         """
-        self.metrics = metrics
-        self.positions = positions
-        
+        self.metrics = metrics or {}
+        self.positions = positions or []
         symbols = self.metrics.get("symbols", [])
-        
+        self.curr_label.setText("0.00")
+        self.opt_label.setText("0.00")
         total_risky_value = sum([pos[3] for pos in self.positions if pos[0] in symbols])
         current_weights = {pos[0]: pos[3] / total_risky_value for pos in self.positions if pos[0] in symbols and total_risky_value > 0}
         
