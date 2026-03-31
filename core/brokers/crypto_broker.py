@@ -27,7 +27,8 @@ class CryptoBroker(BaseBroker):
         self.dust_threshold = float(read_json(PathManager.CONFIG_FILE, "CRYPTO_DUST_THRESHOLD") or 0.0001)
 
         raw_display = str(read_json(PathManager.CONFIG_FILE, "DISPLAY_CURRENCY") or "USDT")
-        self.base_currency = raw_display.split()[0]
+        self.target_currency = raw_display.split()[0]
+        self.base_currency = "USDT"
 
         self.exchange:      ccxt.Exchange | None = None
         self.total_value:   float = 0.0
@@ -225,10 +226,20 @@ class CryptoBroker(BaseBroker):
         except Exception as e:
             app_logger.warning(f"CryptoBroker: P&L calculation failed: {e}")
 
+        fx_conversion_rate = await self.get_fx_rate("USDT", self.target_currency)
+        
+        self.total_value *= fx_conversion_rate
+        self.cash_value_base *= fx_conversion_rate
+        daily_pnl *= fx_conversion_rate
+        
+        for pos in positions_for_ui:
+            pos[2] *= fx_conversion_rate
+            pos[3] *= fx_conversion_rate
+
         return {
             "nlv":               self.total_value,
             "cash":              self.cash_value_base,
-            "currency":          self.base_currency,
+            "currency":          self.target_currency,
             "pnl":               daily_pnl,
             "positions":         positions_for_ui,
             "risky_weight":      sum_risky_weights * 100,
@@ -236,7 +247,6 @@ class CryptoBroker(BaseBroker):
             "raw_weights_dict":  self.weights_dict,
             "sum_risky_weights": sum_risky_weights,
         }
-
     async def fetch_historical_data(self, cache_file: str = "data/crypto_prices_cache.parquet") -> pd.DataFrame:
         """
         Downloads daily OHLCV candles for all risky assets.
@@ -336,7 +346,8 @@ class CryptoBroker(BaseBroker):
     async def get_fx_rate(self, from_currency: str, to_currency: str) -> float:
         """
         Resolves FX rates between fiat/stablecoin currencies.
-        Tries the exchange first, then falls back to Frankfurter API.
+        Tries the exchange first, then falls back to the Frankfurter API.
+        Maps USD-pegged stablecoins to regular USD to prevent 404 errors.
         """
         if from_currency == to_currency:
             return 1.0
@@ -349,19 +360,27 @@ class CryptoBroker(BaseBroker):
             pass
 
         try:
-            base_fiat = "USD" if to_currency == "USDT" else to_currency
+            stablecoins = {"USDT", "USDC", "BUSD", "TUSD", "FDUSD", "DAI", "USDP", "RLUSD"}
+            
+            query_from = "USD" if from_currency in stablecoins else from_currency
+            query_to   = "USD" if to_currency in stablecoins else to_currency
+            
+            if query_from == query_to:
+                return 1.0
+
             async with aiohttp.ClientSession() as session:
-                url = f"https://api.frankfurter.app/latest?from={from_currency}&to={base_fiat}"
+                url = f"https://api.frankfurter.app/latest?from={query_from}&to={query_to}"
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
-                        price = data.get("rates", {}).get(base_fiat)
+                        price = data.get("rates", {}).get(query_to)
                         if price:
                             app_logger.info(f"CryptoBroker: FX rate {from_currency}->{to_currency} resolved via Frankfurter ({price:.4f}).")
                             return float(price)
                     else:
-                        app_logger.warning(f"CryptoBroker: Frankfurter API non supporta {from_currency} (Status: {response.status}).")
+                        app_logger.warning(f"CryptoBroker: Frankfurter API does not support {from_currency} or {to_currency} (Status: {response.status}).")
         except Exception as e:
             app_logger.warning(f"CryptoBroker: Frankfurter FX fallback failed for {from_currency}/{to_currency}: {e}")
+
         app_logger.warning(f"CryptoBroker: Could not resolve FX rate {from_currency}->{to_currency}. Defaulting to 1.0.")
         return 1.0
