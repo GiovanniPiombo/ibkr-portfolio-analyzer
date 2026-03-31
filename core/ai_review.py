@@ -1,7 +1,7 @@
 from google import genai
 from google.genai import types
 import json
-from core.utils import read_json, format_json
+from core.utils import read_json, format_json, retry_with_backoff
 from core.path_manager import PathManager
 from core.logger import app_logger
 
@@ -16,6 +16,7 @@ except ValueError as e:
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+@retry_with_backoff(max_retries=3, base_delay=2.0)
 def get_portfolio_analysis(portfolio_data: dict) -> dict:
     """
     Requests a structured portfolio analysis from the Gemini AI model.
@@ -44,26 +45,40 @@ def get_portfolio_analysis(portfolio_data: dict) -> dict:
     prompt = template.format(**portfolio_data)
     app_logger.info("Sending analysis request to Gemini API...")
 
+    template = prompts_data["portfolio_analysis"]["user_prompt_template"]
+    system_instruction = prompts_data["portfolio_analysis"]["system_instruction"]
+    prompt = template.format(**portfolio_data)
+    app_logger.info("Sending analysis request to Gemini API...")
+
     try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json", 
-                temperature=0.4
-            )
-        )
+        result = _call_gemini_api(client, prompt, system_instruction)
         app_logger.debug("Successfully received response from Gemini.")
-        return json.loads(response.text)
+        return result
         
     except json.JSONDecodeError:
         app_logger.error("Gemini AI did not return a valid JSON format.")
         return {"error": "The AI did not return a valid JSON format."}
     except Exception as e:
-        app_logger.error(f"Connection or API error with Gemini: {str(e)}")
+        app_logger.error(f"Connection or API error with Gemini after retries: {str(e)}")
         return {"error": f"Connection or API error: {str(e)}"}
     
+@retry_with_backoff(max_retries=3, base_delay=2.0)
+def _call_gemini_api(client, prompt, system_instruction):
+    """
+    Helper function that actually executes the API call.
+    If it fails, the exception bubbles up to the decorator, triggering a retry.
+    """
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            response_mime_type="application/json", 
+            temperature=0.4
+        )
+    )
+    return json.loads(response.text)
+
 if __name__ == "__main__":
     # Dummy data to test the module in isolation
     dummy_data = {

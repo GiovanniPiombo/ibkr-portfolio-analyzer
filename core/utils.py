@@ -1,3 +1,5 @@
+import time
+from functools import wraps
 import json
 from core.logger import app_logger
 
@@ -72,3 +74,31 @@ def write_json(file, data):
     except Exception as e:
         app_logger.error(f"Error writing {file}: {e}")
         return False
+    
+def retry_with_backoff(max_retries: int = 3, base_delay: float = 2.0):
+    """
+    Synchronous decorator that retries a function execution in case of 503 or 429 errors.
+    It uses exponential backoff to calculate the wait time between attempts.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if "503" in error_str:
+                        if attempt == max_retries:
+                            app_logger.error(f"[{func.__name__}] Failed permanently after {max_retries} attempts: {e}")
+                            raise e
+                        delay = base_delay * (2 ** attempt)
+                        app_logger.warning(
+                            f"[{func.__name__}] API Error (503)"
+                            f"Retrying in {delay}s... (Attempt {attempt + 1}/{max_retries})"
+                        )
+                        time.sleep(delay) 
+                    else:
+                        raise e
+        return wrapper
+    return decorator
