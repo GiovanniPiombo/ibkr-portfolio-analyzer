@@ -38,7 +38,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='IBKR_Portfolio_Analyzer',
+    name='AlphaPaths',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -61,5 +61,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='IBKR_Portfolio_Analyzer',
+    name='AlphaPaths',
 )

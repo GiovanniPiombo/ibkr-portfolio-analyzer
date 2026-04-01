@@ -24,6 +24,7 @@ class PathManager:
 
     CONFIG_FILE: Path = Path(os.getenv("APP_CONFIG_FILE", EXTERNAL_DIR / "config.json"))
     PROMPTS_FILE: Path = Path(os.getenv("APP_PROMPTS_FILE", EXTERNAL_DIR / "prompts.json"))
+    MANUAL_PORTFOLIO_FILE: Path = Path(os.getenv("APP_MANUAL_PORTFOLIO_FILE", EXTERNAL_DIR / "manual_portfolio.json"))
     STYLE_FILE: Path = Path(os.getenv("APP_STYLE_FILE", ASSETS_DIR / "style.qss"))
     ICON_FILE: str = str(Path(os.getenv("APP_ICON_FILE", ASSETS_DIR / "Icon.ico" )))
 
@@ -67,3 +68,22 @@ class PathManager:
             with open(cls.PROMPTS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(default_prompts, f, indent=4)
             app_logger.info(f"Created default prompts at {cls.PROMPTS_FILE}")
+
+        if not cls.MANUAL_PORTFOLIO_FILE.exists():
+            default_manual_portfolio = {
+                "base_currency": "EUR",
+                "cash": 12500.00,
+                "positions": [
+                    {"ticker": "AAPL", "quantity": 15.5},
+                    {"ticker": "MSFT", "quantity": 10},
+                    {"ticker": "VWCE.DE", "quantity": 125},
+                    {"ticker": "CSSPX.MI", "quantity": 30},
+                    {"ticker": "BTC-USD", "quantity": 0.5}
+                ]
+            }
+            try:
+                with open(cls.MANUAL_PORTFOLIO_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(default_manual_portfolio, f, indent=4)
+                app_logger.info(f"Created default manual portfolio at {cls.MANUAL_PORTFOLIO_FILE}")
+            except Exception as e:
+                app_logger.error(f"Failed to create manual portfolio file: {e}")
