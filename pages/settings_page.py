@@ -64,13 +64,12 @@ class SettingsPage(QWidget):
         layout_broker.setContentsMargins(15, 15, 15, 15)
         layout_broker.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        # Main Broker Settings
         self.active_broker_input = QComboBox()
         self.active_broker_input.addItems(["Interactive Brokers", "Alpaca", "Crypto Exchange", "Manual (Yahoo Finance)"])
         self.active_broker_input.currentTextChanged.connect(self.toggle_broker_fields)
         
         self.currency_input = QComboBox()
-        self.currency_input.addItems(["AUTO (Broker Default)", "USD", "EUR", "GBP", "CHF", "USDT"])
+        self.currency_input.addItems(["AUTO (Broker Default)", "USD", "EUR", "GBP", "CHF"])
 
         # IBKR Fields
         self.ibkr_host_input = QLineEdit()
@@ -90,7 +89,7 @@ class SettingsPage(QWidget):
         self.alpaca_api_input.setEchoMode(QLineEdit.Password)
         self.alpaca_secret_input = QLineEdit()
         self.alpaca_secret_input.setEchoMode(QLineEdit.Password)
-        self.alpaca_testnet_input = QCheckBox("Enable Paper Trading")
+        self.alpaca_testnet_input = QCheckBox()
 
         # Crypto Fields
         self.crypto_exchange_input = QLineEdit()
@@ -98,7 +97,7 @@ class SettingsPage(QWidget):
         self.crypto_api_input.setEchoMode(QLineEdit.Password)
         self.crypto_secret_input = QLineEdit()
         self.crypto_secret_input.setEchoMode(QLineEdit.Password)
-        self.crypto_testnet_input = QCheckBox("Enable Sandbox/Testnet")
+        self.crypto_testnet_input = QCheckBox()
         self.crypto_dust_input = QDoubleSpinBox()
         self.crypto_dust_input.setDecimals(4)
         self.crypto_dust_input.setRange(0.0, 10.0)
@@ -107,33 +106,52 @@ class SettingsPage(QWidget):
         layout_broker.addRow(QLabel("Active Broker:"), self.active_broker_input)
         layout_broker.addRow(QLabel("Display Currency:"), self.currency_input)
         
-        # Separator for IBKR
+        # ─── IBKR CONTAINER ──────────────────────────────────────────
+        self.ibkr_container = QWidget()
+        ibkr_layout = QFormLayout(self.ibkr_container)
+        ibkr_layout.setContentsMargins(0, 0, 0, 0)
+        ibkr_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
         ibkr_label = QLabel("Interactive Brokers")
         ibkr_label.setStyleSheet("color: gray; font-style: italic; margin-top: 10px; margin-bottom: 5px;")
-        layout_broker.addRow(ibkr_label)
-        layout_broker.addRow(QLabel("Host (IP):"), self.ibkr_host_input)
-        layout_broker.addRow(QLabel("Port:"), self.ibkr_port_input)
-        layout_broker.addRow(QLabel("Client ID:"), self.ibkr_client_id_input)
-        layout_broker.addRow(QLabel("Data Timeout:"), self.ibkr_timeout_input)
-        layout_broker.addRow(QLabel("Pacing Limit:"), self.pacing_limit)
+        ibkr_layout.addRow(ibkr_label)
+        ibkr_layout.addRow(QLabel("Host (IP):"), self.ibkr_host_input)
+        ibkr_layout.addRow(QLabel("Port:"), self.ibkr_port_input)
+        ibkr_layout.addRow(QLabel("Client ID:"), self.ibkr_client_id_input)
+        ibkr_layout.addRow(QLabel("Data Timeout:"), self.ibkr_timeout_input)
+        ibkr_layout.addRow(QLabel("Pacing Limit:"), self.pacing_limit)
 
-        # Separator for Alpaca
+        # ─── ALPACA CONTAINER ────────────────────────────────────────
+        self.alpaca_container = QWidget()
+        alpaca_layout = QFormLayout(self.alpaca_container)
+        alpaca_layout.setContentsMargins(0, 0, 0, 0)
+        alpaca_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
         alpaca_label = QLabel("Alpaca")
         alpaca_label.setStyleSheet("color: gray; font-style: italic; margin-top: 10px; margin-bottom: 5px;")
-        layout_broker.addRow(alpaca_label)
-        layout_broker.addRow(QLabel("API Key:"), self.alpaca_api_input)
-        layout_broker.addRow(QLabel("Secret Key:"), self.alpaca_secret_input)
-        layout_broker.addRow(QLabel("Paper Trading:"), self.alpaca_testnet_input)
+        alpaca_layout.addRow(alpaca_label)
+        alpaca_layout.addRow(QLabel("API Key:"), self.alpaca_api_input)
+        alpaca_layout.addRow(QLabel("Secret Key:"), self.alpaca_secret_input)
+        alpaca_layout.addRow(QLabel("Paper Trading:"), self.alpaca_testnet_input)
 
-        # Separator for Crypto
+        # ─── CRYPTO CONTAINER ────────────────────────────────────────
+        self.crypto_container = QWidget()
+        crypto_layout = QFormLayout(self.crypto_container)
+        crypto_layout.setContentsMargins(0, 0, 0, 0)
+        crypto_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
         crypto_label = QLabel("Crypto Exchange")
         crypto_label.setStyleSheet("color: gray; font-style: italic; margin-top: 10px; margin-bottom: 5px;")
-        layout_broker.addRow(crypto_label)
-        layout_broker.addRow(QLabel("CCXT Exchange ID:"), self.crypto_exchange_input)
-        layout_broker.addRow(QLabel("API Key:"), self.crypto_api_input)
-        layout_broker.addRow(QLabel("Secret:"), self.crypto_secret_input)
-        layout_broker.addRow(QLabel("Testnet:"), self.crypto_testnet_input)
-        layout_broker.addRow(QLabel("Dust Threshold:"), self.crypto_dust_input)
+        crypto_layout.addRow(crypto_label)
+        crypto_layout.addRow(QLabel("CCXT Exchange ID:"), self.crypto_exchange_input)
+        crypto_layout.addRow(QLabel("API Key:"), self.crypto_api_input)
+        crypto_layout.addRow(QLabel("Secret:"), self.crypto_secret_input)
+        crypto_layout.addRow(QLabel("Testnet:"), self.crypto_testnet_input)
+        crypto_layout.addRow(QLabel("Dust Threshold:"), self.crypto_dust_input)
+
+        layout_broker.addRow(self.ibkr_container)
+        layout_broker.addRow(self.alpaca_container)
+        layout_broker.addRow(self.crypto_container)
 
         tab_broker.setWidget(broker_content)
         self.tabs.addTab(tab_broker, "Broker Settings")
@@ -197,7 +215,6 @@ class SettingsPage(QWidget):
         self.tabs.addTab(tab_mc, "Monte Carlo")
 
         # ── TAB 4: AI Configuration ───────────────────────────────────
-
         tab_ai = QScrollArea()
         tab_ai.setWidgetResizable(True)
         tab_ai.setStyleSheet(scroll_style)
@@ -227,6 +244,7 @@ class SettingsPage(QWidget):
 
         main_layout.addSpacing(20)
 
+        # ── BUTTONS ──────────────────────────────────────────────────
         btn_layout = QHBoxLayout()
         self.save_btn = QPushButton("Save Settings")
         self.save_btn.setObjectName("primary_btn")
@@ -333,22 +351,7 @@ class SettingsPage(QWidget):
             QMessageBox.critical(self, "Error", "Could not save the config.json file.")
 
     def toggle_broker_fields(self, text: str):
-        """Disables specific broker inputs if they are not the currently selected active broker."""
-        is_ibkr = (text == "Interactive Brokers")
-        self.ibkr_host_input.setEnabled(is_ibkr)
-        self.ibkr_port_input.setEnabled(is_ibkr)
-        self.ibkr_client_id_input.setEnabled(is_ibkr)
-        self.ibkr_timeout_input.setEnabled(is_ibkr)
-        self.pacing_limit.setEnabled(is_ibkr)
-
-        is_alpaca = (text == "Alpaca")
-        self.alpaca_api_input.setEnabled(is_alpaca)
-        self.alpaca_secret_input.setEnabled(is_alpaca)
-        self.alpaca_testnet_input.setEnabled(is_alpaca)
-
-        is_crypto = (text == "Crypto Exchange")
-        self.crypto_exchange_input.setEnabled(is_crypto)
-        self.crypto_api_input.setEnabled(is_crypto)
-        self.crypto_secret_input.setEnabled(is_crypto)
-        self.crypto_testnet_input.setEnabled(is_crypto)
-        self.crypto_dust_input.setEnabled(is_crypto)
+        """Shows or hides containers based on the currently selected broker."""
+        self.ibkr_container.setVisible(text == "Interactive Brokers")
+        self.alpaca_container.setVisible(text == "Alpaca")
+        self.crypto_container.setVisible(text == "Crypto Exchange")
