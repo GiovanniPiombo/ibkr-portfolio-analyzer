@@ -42,6 +42,7 @@ class PathManager:
     MANUAL_PORTFOLIO_FILE: Path = Path(os.getenv("APP_MANUAL_PORTFOLIO_FILE", EXTERNAL_DIR / "manual_portfolio.json"))
     STYLE_FILE: Path = Path(os.getenv("APP_STYLE_FILE", ASSETS_DIR / "style.qss"))
     ICON_FILE: str = str(Path(os.getenv("APP_ICON_FILE", ASSETS_DIR / "Icon.ico" )))
+    THIRD_PARTY_NOTICES_FILE: str = str(Path(os.getenv("APP_THIRD_PARTY_NOTICES_FILE", BASE_DIR / "THIRDPARTY-NOTICES.txt")))
 
     @classmethod
     def get_asset(cls, filename: str) -> Path:

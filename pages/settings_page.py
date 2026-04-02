@@ -417,7 +417,7 @@ class SettingsPage(QWidget):
         text_edit.setReadOnly(True)
         text_edit.setStyleSheet("font-family: Consolas, monospace; background-color: #1e1e1e; color: #d4d4d4;")
         
-        file_path = "THIRDPARTY-NOTICES.txt"
+        file_path = PathManager.THIRD_PARTY_NOTICES_FILE
         if os.path.exists(file_path):
             with open(file_path, "r", encoding="utf-8") as f:
                 text_edit.setPlainText(f.read())

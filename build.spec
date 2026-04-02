@@ -13,7 +13,7 @@ a = Analysis(
         ('pages', 'pages'),
         ('workers', 'workers'),
         ('config.json', '.'),
-        ('prompts.json', '.')
+        ('prompts.json', '.'),
         ('LICENSE', '.'),
         ('THIRDPARTY-NOTICES.txt', '.')
     ],
