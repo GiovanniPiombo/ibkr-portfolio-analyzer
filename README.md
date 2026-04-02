@@ -5,7 +5,7 @@
 [![Multi-Broker](https://img.shields.io/badge/Broker-IBKR%20%7C%20Alpaca%20%7C%20Crypto%20%7C%20Manual-orange)]()
 [![Yahoo Finance](https://img.shields.io/badge/yfinance-Market%20Data-blueviolet)]()
 [![Tests](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml/badge.svg)](https://github.com/GiovanniPiombo/ibkr-portfolio-analyzer/actions/workflows/tests.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 AlphaPaths is a professional-grade desktop application for advanced risk analysis, Monte Carlo simulation, and portfolio optimization. It features a modular multi-broker architecture that supports direct connections to Interactive Brokers (IBKR), Alpaca, and major Crypto Exchanges (via CCXT), or a fully functional Manual Mode using Yahoo Finance—making it accessible to any investor, regardless of their brokerage.
 
@@ -92,7 +92,8 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 ├── config.template.json             # Template for app configuration (API keys, settings). Rename to config.json.
 ├── manual_portfolio.template.json   # Template for the Manual Broker (Yahoo Finance). Rename to manual_portfolio.json.
 ├── prompts.json                     # Contains the system instructions and user prompt templates for the AI.
-├── LICENSE                          # MIT License
+├── LICENSE                          # GPLv3 License
+├── THIRDPARTY-NOTICES.txt           # Open-source licenses for third-party libraries
 ├── build.spec                       # Pyinstaller spec file
 └── requirements.txt                 # Python package dependencies.
 ```
@@ -179,7 +180,7 @@ Follow these steps if you want to run the application directly from the source c
 
 #### 2. Build the Executable PyInstaller
 
-The application can be packaged into a single executable file using PyInstaller, making it easy to distribute and run without a Python environment.
+The application can be packaged into a standalone directory containing the executable using PyInstaller. This ensures compliance with PySide6's LGPLv3 dynamic linking requirements while making it easy to distribute and run without a Python environment.
 
 ##### Prerequisites
 
@@ -268,4 +269,18 @@ The core mathematical logic is thoroughly tested. To run the test suite:
    pytest tests/ -v
 ```
 
+## License & Commercial Use
 
+AlphaPaths is strictly distributed under the **GNU General Public License v3.0 (GPLv3)**. 
+
+This means you are free to use, modify, and distribute this software for personal, academic, or open-source projects, provided that any derivative works are also open-sourced under the exact same GPLv3 license.
+
+### Dual Licensing (Commercial Use)
+If you represent a company, hedge fund, or software house and wish to use, integrate, or distribute AlphaPaths (or its internal quantitative models) within a **closed-source or proprietary software/service**, the GPLv3 license does not permit this. 
+
+To use AlphaPaths commercially without the obligation to open-source your proprietary code, you must obtain a separate **Commercial License**. 
+
+Please contact me to discuss commercial licensing options and B2B integrations.
+
+---
+*Note: This software uses PySide6, which is licensed under the LGPLv3. For a full list of third-party libraries and their respective licenses, please refer to the [THIRDPARTY-NOTICES.txt](THIRDPARTY-NOTICES.txt) file included in this repository.*
