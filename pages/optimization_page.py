@@ -16,6 +16,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QMessageBox, QSlider
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
+from superqt import QRangeSlider
 from workers.optimization_thread import OptimizationWorker
 from components.markowitz_chart import MarkowitzChartView
 from core.logger import app_logger
@@ -60,21 +61,21 @@ class OptimizationPage(QWidget):
         header_label = QLabel("Portfolio Optimization (Core-Satellite)")
         header_label.setObjectName("page_header")
         
-        self.run_btn = QPushButton("Run Optimization")
-        self.run_btn.setObjectName("primary_btn")
-        self.run_btn.setMinimumHeight(38)
-        self.run_btn.clicked.connect(self.on_run_clicked)
+        self.weight_slider = QRangeSlider(Qt.Horizontal)
+        self.weight_slider.setRange(0, 100)
+        self.weight_slider.setValue((0, 100))
+        self.weight_slider.setMinimumWidth(150)
 
-        self.max_weight_slider = QSlider(Qt.Horizontal)
-        self.max_weight_slider.setRange(1, 100)
-        self.max_weight_slider.setValue(100)
-        self.max_weight_slider.setMinimumWidth(150)
+        self.weight_slider.setObjectName("range_slider")
+        palette = self.weight_slider.palette()
+        palette.setColor(palette.ColorRole.Highlight, QColor("#F0A500"))
+        self.weight_slider.setPalette(palette)
         
-        self.slider_label = QLabel("100%")
-        self.slider_label.setMinimumWidth(45)
+        self.slider_label = QLabel("Min: 0% | Max: 100%")
+        self.slider_label.setMinimumWidth(140)
         self.slider_label.setStyleSheet("font-weight: bold; font-family: 'Consolas', monospace;")
         
-        self.max_weight_slider.valueChanged.connect(lambda v: self.slider_label.setText(f"{v}%"))
+        self.weight_slider.valueChanged.connect(self.on_slider_changed)
         
         self.run_btn = QPushButton("Run Optimization")
         self.run_btn.setObjectName("primary_btn")
@@ -83,8 +84,8 @@ class OptimizationPage(QWidget):
         
         header_layout.addWidget(header_label)
         header_layout.addStretch()
-        header_layout.addWidget(QLabel("Max Satellite %:"))
-        header_layout.addWidget(self.max_weight_slider)
+        header_layout.addWidget(QLabel("Satellite Limits:"))
+        header_layout.addWidget(self.weight_slider)
         header_layout.addWidget(self.slider_label)
         header_layout.addWidget(self.run_btn)
         main_layout.addLayout(header_layout)
@@ -223,10 +224,8 @@ class OptimizationPage(QWidget):
 
     def on_run_clicked(self):
         """
-        Handles the click event on the "Run Optimization" button.
-        
-        Since the slider physically prevents mathematically impossible 
-        weight constraints, we only need to gather the data and launch the worker.
+        Handles the click event on the 'Run Optimization' button.
+        Gathers both min and max constraints and starts the background thread.
         """
         if not self.metrics or not self.positions:
             app_logger.warning("Optimization blocked: Data Missing")
@@ -234,12 +233,18 @@ class OptimizationPage(QWidget):
             return
 
         locked = self.get_locked_symbols()
-        max_sat_weight = self.max_weight_slider.value() / 100.0
+        
+        min_sat, max_sat = self.weight_slider.value()
+        min_sat_weight = min_sat / 100.0
+        max_sat_weight = max_sat / 100.0
+        
         self.optimization_started.emit()
         self.run_btn.setEnabled(False)
         self.run_btn.setText("Optimizing...")
-        app_logger.info(f"Starting OptimizationWorker. Locked assets: {locked}, Max Sat Weight: {max_sat_weight}")
-        self.worker = OptimizationWorker(self.metrics, self.positions, locked, max_sat_weight)
+        
+        app_logger.info(f"Starting OptimizationWorker. Locked: {locked}, Limits: [{min_sat_weight}, {max_sat_weight}]")
+        
+        self.worker = OptimizationWorker(self.metrics, self.positions, locked, min_sat_weight, max_sat_weight)
         self.worker.progress_update.connect(lambda msg: self.run_btn.setText(msg))
         self.worker.optimization_finished.connect(self.on_optimization_complete)
         self.worker.error_occurred.connect(self.on_error)
@@ -317,36 +322,50 @@ class OptimizationPage(QWidget):
 
     def on_table_item_changed(self, item: QTableWidgetItem):
         """
-        Triggered when any cell changes. We only care about the lock checkboxes (column 2).
+        Triggered when the user interacts with the "Lock" checkboxes in the table.
         """
         if item.column() == 2:
             self.update_weight_constraints()
 
     def update_weight_constraints(self):
         """
-        Calculates the mathematical minimum required weight for satellite assets 
-        and physically locks the slider's minimum bound to prevent impossible states.
+        Triggered when the user interacts with the 'Lock' checkboxes in the table.
+        Forces a re-evaluation of the slider constraints.
         """
-        if not self.metrics or not self.positions:
-            return
-            
-        locked = self.get_locked_symbols()
-        symbols = self.metrics.get("symbols", [])
+        current_values = self.weight_slider.value()
+        self.on_slider_changed(current_values)
+    
+    def on_slider_changed(self, values):
+        """
+        Updates the label and dynamically applies mathematical constraints to the slider.
+        Ensures the user cannot select a min/max combination that mathematically 
+        prevents the optimizer from allocating 100% of the portfolio.
+        """
+        self.weight_slider.blockSignals(True)
         
-        total_risky_value = sum([pos[3] for pos in self.positions if pos[0] in symbols])
-        if total_risky_value <= 0: 
-            return
-            
-        current_weights = {pos[0]: pos[3] / total_risky_value for pos in self.positions if pos[0] in symbols}
-        locked_weight_sum = sum([current_weights.get(sym, 0.0) for sym in locked])
-        num_satellites = len(symbols) - len(locked)
+        min_val, max_val = values
         
-        if num_satellites > 0:
-            min_required = (1.0 - locked_weight_sum) / num_satellites
-            min_percent = math.ceil(min_required * 100.0)
-            min_percent = max(1, min_percent)
-            min_percent = min(100, min_percent)
-            self.max_weight_slider.setMinimum(min_percent)
-        else:
-            self.max_weight_slider.setMinimum(100)
-            self.max_weight_slider.setValue(100)
+        if self.metrics and self.positions:
+            locked = self.get_locked_symbols()
+            symbols = self.metrics.get("symbols", [])
+            total_risky_value = sum([pos[3] for pos in self.positions if pos[0] in symbols])
+            
+            if total_risky_value > 0:
+                current_weights = {pos[0]: pos[3] / total_risky_value for pos in self.positions if pos[0] in symbols}
+                locked_weight_sum = sum([current_weights.get(sym, 0.0) for sym in locked])
+                num_satellites = len(symbols) - len(locked)
+                
+                if num_satellites > 0:
+                    math_limit = (1.0 - locked_weight_sum) / num_satellites
+                    max_allowed_min = math.floor(math_limit * 100.0)
+                    min_required_max = math.ceil(math_limit * 100.0)
+                    
+                    if min_val > max_allowed_min:
+                        min_val = max(0, max_allowed_min)
+                    if max_val < min_required_max:
+                        max_val = min(100, min_required_max)
+                        
+                    self.weight_slider.setValue((min_val, max_val))
+        
+        self.slider_label.setText(f"Min: {min_val}% | Max: {max_val}%")
+        self.weight_slider.blockSignals(False)

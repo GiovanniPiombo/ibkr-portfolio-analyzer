@@ -54,6 +54,7 @@ The following libraries are distributed under the BSD 3-Clause License:
 - pandas (https://github.com/pandas-dev/pandas)
 - numpy (https://github.com/numpy/numpy)
 - scipy (https://github.com/scipy/scipy)
+- superqt (https://github.com/pyapp-kit/superqt)
 
 --- BSD 3-Clause License Text ---
 Redistribution and use in source and binary forms, with or without

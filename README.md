@@ -101,7 +101,7 @@ The codebase is meticulously organized following the **Separation of Concerns** 
 ## Technology Stack
 
 - Core Language: Python 3.9+
-- GUI Framework: PySide6 (Qt for Python)
+- GUI Framework: PySide6 (Qt for Python), superqt
 - Data & Math: Pandas, NumPy, SciPy
 - Visualization: Qt Charts (PySide6)
 - Broker Integration:

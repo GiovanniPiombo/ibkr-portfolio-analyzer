@@ -681,3 +681,28 @@ QTabBar::tab:hover:!selected {
     background-color: #0F1820;
     color: #C8D0DC;
 }
+
+/* ── RANGE SLIDER (superqt) ───────────────────────────────── */
+
+#range_slider {
+    background-color: transparent;
+}
+
+#range_slider::groove:horizontal {
+    border-radius: 2px;
+    height: 4px;
+    background: #2A3A4A;
+}
+
+#range_slider::handle:horizontal {
+    background: #F0A500;
+    width: 14px;
+    height: 14px;
+    margin: -5px 0;
+    border-radius: 7px;
+}
+
+#range_slider::sub-page:horizontal,
+#range_slider::add-page:horizontal {
+    background: transparent;
+}
