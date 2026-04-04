@@ -121,12 +121,8 @@ class ManualBroker(BaseBroker):
                 qty = float(pos["quantity"])
                 
                 try:
-                    if len(self.risky_assets) == 1:
-                        current_price = float(yf_data['Close'].iloc[-1])
-                        prev_close = float(yf_data['Close'].iloc[-2])
-                    else:
-                        current_price = float(yf_data['Close'][sym].iloc[-1])
-                        prev_close = float(yf_data['Close'][sym].iloc[-2])
+                    current_price = float(yf_data['Close'][sym].iloc[-1])
+                    prev_close = float(yf_data['Close'][sym].iloc[-2])
                     
                     if pd.isna(current_price):
                         app_logger.warning(f"ManualBroker: Missing data for {sym}. Setting price to 0.")
@@ -188,10 +184,7 @@ class ManualBroker(BaseBroker):
 
         data = yf.download(self.risky_assets, period="5y", progress=False)
         
-        if len(self.risky_assets) == 1:
-            all_prices = data[['Close']].rename(columns={'Close': self.risky_assets[0]})
-        else:
-            all_prices = data['Close']
+        all_prices = data['Close']
             
         all_prices.ffill(inplace=True)
         all_prices.dropna(inplace=True)
