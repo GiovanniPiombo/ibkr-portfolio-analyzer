@@ -24,6 +24,7 @@ from core.merton_model import MJDSimulator
 from core.path_manager import PathManager
 from core.logger import app_logger
 from core.brokers.factory import BrokerFactory
+from core.garch_model import GARCHSimulator
 
 class SimulationWorker(QThread):
     """
@@ -126,9 +127,19 @@ class SimulationWorker(QThread):
                 "background": merton_t[:100, :]
             }
 
+            garch_t = sim_results["garch"]["prices"].T
+            garch_data = {
+                "scenarios": sim_results["garch"]["scenarios"],
+                "worst": np.percentile(garch_t, 5, axis=0),
+                "median": np.percentile(garch_t, 50, axis=0),
+                "best": np.percentile(garch_t, 95, axis=0),
+                "background": garch_t[:100, :]
+            }
+
             payload = {
                 "gbm": gbm_data,
                 "merton": merton_data,
+                "garch": garch_data,
                 "metrics": metrics,
                 "time_steps": np.arange(merton_t.shape[1])
             }
@@ -195,6 +206,15 @@ class FastMathWorker(QThread):
             risky_merton = merton_sim.simulate()
             if self.metrics["risky_capital"] <= 0: risky_merton *= 0
 
+            garch_sim = GARCHSimulator(
+                capital=safe_capital, mu=self.metrics["risky_mu"], 
+                years=self.years, simulations=self.simulations,
+                omega=self.metrics["garch_omega"], alpha=self.metrics["garch_alpha"], 
+                beta=self.metrics["garch_beta"], initial_variance=self.metrics["garch_initial_var"]
+            )
+            risky_garch = garch_sim.simulate()
+            if self.metrics["risky_capital"] <= 0: risky_garch *= 0
+
             dt = 1.0 / 252
             steps = int(self.years * 252)
             cash_growth = np.exp(self.metrics["risk_free_rate"] * dt * np.arange(steps + 1))
@@ -202,6 +222,7 @@ class FastMathWorker(QThread):
 
             total_gbm = risky_gbm + cash_matrix
             total_merton = risky_merton + cash_matrix
+            total_garch = risky_garch + cash_matrix
 
             gbm_t = total_gbm.T
             gbm_data = {
@@ -221,9 +242,19 @@ class FastMathWorker(QThread):
                 "background": merton_t[:100, :]
             }
 
+            garch_t = total_garch.T
+            garch_data = {
+                "scenarios": garch_sim.get_scenarios(total_garch),
+                "worst": np.percentile(garch_t, 5, axis=0),
+                "median": np.percentile(garch_t, 50, axis=0),
+                "best": np.percentile(garch_t, 95, axis=0),
+                "background": garch_t[:100, :]
+            }
+
             payload = {
                 "gbm": gbm_data,
                 "merton": merton_data,
+                "garch": garch_data,
                 "time_steps": np.arange(merton_t.shape[1])
             }
             self.data_calculated.emit(payload)
