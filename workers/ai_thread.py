@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from PySide6.QtCore import QThread, Signal
-from core.ai_review import get_portfolio_analysis
+from core.ai.factory import get_portfolio_analysis
 from core.logger import app_logger
 
 class AIWorker(QThread):
